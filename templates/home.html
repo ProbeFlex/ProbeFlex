@@ -7,6 +7,43 @@
 <!-- Add CSRF token for AJAX requests -->
 {% csrf_token %}
 
+<!-- Add CSS for response containers -->
+<style>
+    .response-container {
+        max-height: 500px;
+        overflow-y: auto;
+        overflow-x: auto;
+        background-color: #f8f9fa;
+        border-radius: 4px;
+        padding: 10px;
+    }
+    
+    .response-container pre {
+        margin: 0;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+    
+    /* Set fixed height for request body editors */
+    #json-editor, #raw-editor {
+        height: 300px;
+        max-height: 300px;
+        resize: none;
+    }
+    
+    /* Ensure proper display of JSONFormatter content */
+    .json-formatter-row {
+        font-family: monospace;
+        font-size: 14px;
+    }
+    
+    /* Ensure error messages are visible */
+    .text-danger {
+        color: #dc3545 !important;
+        font-weight: bold;
+    }
+</style>
+
 <div class="container-fluid px-0">
     <div class="card border-0 shadow-sm">
         <div class="card-body">
@@ -288,6 +325,14 @@
             document.querySelectorAll('.body-inputs').forEach(el => el.style.display = 'none');
             if (bodyType !== 'none') {
                 document.getElementById(`${bodyType}-body`).style.display = 'block';
+            }
+        });
+        
+        // Add keyboard event handling for URL field - press Enter to send
+        document.getElementById('url-ajax').addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                sendRequest();
             }
         });
 
@@ -629,8 +674,21 @@
                 console.error('Error:', error);
                 document.getElementById('status-code').textContent = 'Error';
                 document.getElementById('status-code').className = 'badge bg-danger';
-                document.getElementById('response-body-content').innerHTML = `<p class="text-danger">Error: ${error.message}</p>`;
-                document.getElementById('response-headers-content').innerHTML = `<p class="text-danger">Error: ${error.message}</p>`;
+                
+                // Create proper error displays
+                const errorBodyContainer = document.getElementById('response-body-content');
+                errorBodyContainer.innerHTML = '';
+                const errorBodyMessage = document.createElement('div');
+                errorBodyMessage.className = 'alert alert-danger';
+                errorBodyMessage.textContent = 'Error: ' + error.message;
+                errorBodyContainer.appendChild(errorBodyMessage);
+                
+                const errorHeadersContainer = document.getElementById('response-headers-content');
+                errorHeadersContainer.innerHTML = '';
+                const errorHeadersMessage = document.createElement('div');
+                errorHeadersMessage.className = 'alert alert-danger';
+                errorHeadersMessage.textContent = 'Error: ' + error.message;
+                errorHeadersContainer.appendChild(errorHeadersMessage);
             });
         }
 
