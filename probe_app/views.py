@@ -54,17 +54,36 @@ def home(request):
 
 
 @login_required
+@csrf_exempt  # For test purposes only, remove in production
 def send_request(request):
     """View for sending API requests and storing results"""
     if request.method == 'POST':
         try:
-            data = json.loads(request.body)
+            # Print debug info to console
+            print(f"Request received: {request.POST or request.body}")
+            
+            # Try to handle both form data and JSON
+            if request.content_type == 'application/json':
+                data = json.loads(request.body)
+            else:
+                # Handle form data
+                data = {
+                    'url': request.POST.get('url', ''),
+                    'method': request.POST.get('method', 'GET').upper(),
+                    'headers': {},  # Form will handle this differently
+                    'params': {},
+                    'body': {},
+                    'auth': {},
+                }
+                
             url = data.get('url', '')
             method = data.get('method', 'GET').upper()
             headers = data.get('headers', {})
             params = data.get('params', {})
             request_body = data.get('body', {})
             auth_data = data.get('auth', {})
+            
+            print(f"Processing request: {method} {url}")
             
             auth = None
             if auth_data.get('type') == 'basic':
@@ -126,12 +145,30 @@ def send_request(request):
                     executed_by=request.user
                 )
             
+            print(f"Request completed: {method} {url} - {response.status_code}")
             return JsonResponse(response_data)
         
         except requests.RequestException as e:
+            print(f"Request error: {str(e)}")
             return JsonResponse({'error': str(e)}, status=500)
         except Exception as e:
+            print(f"Unexpected error: {str(e)}")
             return JsonResponse({'error': str(e)}, status=500)
+    
+    # For debugging - allow GET requests temporarily
+    if request.method == 'GET':
+        test_url = request.GET.get('url')
+        if test_url:
+            try:
+                response = requests.get(test_url)
+                return JsonResponse({
+                    'status_code': response.status_code,
+                    'body': response.text[:1000],  # Truncate long responses
+                    'headers': dict(response.headers),
+                    'time': 0
+                })
+            except Exception as e:
+                return JsonResponse({'error': str(e)})
     
     return JsonResponse({'error': 'Only POST requests are allowed'}, status=405)
 

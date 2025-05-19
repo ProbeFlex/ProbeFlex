@@ -4,13 +4,16 @@
 {% block title %}ProbeFlex - API Testing Tool{% endblock %}
 
 {% block content %}
+<!-- Add CSRF token for AJAX requests -->
+{% csrf_token %}
+
 <div class="container-fluid px-0">
     <div class="card border-0 shadow-sm">
         <div class="card-body">
             <div class="d-flex align-items-center mb-3">
                 <div class="flex-grow-1">
                     <div class="input-group">
-                        <select class="form-select flex-grow-0" style="width: 120px;" id="method">
+                        <select class="form-select flex-grow-0" style="width: 120px;" id="method-ajax">
                             <option value="GET">GET</option>
                             <option value="POST">POST</option>
                             <option value="PUT">PUT</option>
@@ -19,8 +22,8 @@
                             <option value="HEAD">HEAD</option>
                             <option value="OPTIONS">OPTIONS</option>
                         </select>
-                        <input type="text" class="form-control" id="url" placeholder="Enter URL (e.g. https://api.example.com/v1/endpoint)">
-                        <button class="btn btn-primary" id="send-btn">Send</button>
+                        <input type="text" class="form-control" id="url-ajax" placeholder="Enter URL (e.g. https://api.example.com/v1/endpoint)">
+                        <button class="btn btn-primary" id="send-btn-ajax">Send</button>
                     </div>
                 </div>
                 <div class="ms-2">
@@ -267,6 +270,9 @@
 {% block extra_js %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // Get CSRF token
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        
         // Auth type toggle
         document.getElementById('auth-type').addEventListener('change', function() {
             const authType = this.value;
@@ -361,21 +367,98 @@
             });
         });
 
-        // Send button
-        document.getElementById('send-btn').addEventListener('click', function() {
+        // AJAX Send button - Fixed event listener
+        document.getElementById('send-btn-ajax').addEventListener('click', function() {
             sendRequest();
         });
 
-        // Save button
+        // Save button opens modal
         document.getElementById('save-btn').addEventListener('click', function() {
             const modal = new bootstrap.Modal(document.getElementById('saveRequestModal'));
             modal.show();
         });
 
-        // Save request button in modal
-        document.getElementById('save-request-btn').addEventListener('click', function() {
-            saveRequest();
-        });
+        function updateResponse(message) {
+            document.getElementById('status-code').textContent = 'Processing...';
+            document.getElementById('status-code').className = 'badge bg-secondary';
+            document.getElementById('response-time').textContent = '0 ms';
+            document.getElementById('response-body-content').innerHTML = `<p class="text-muted">${message}</p>`;
+            document.getElementById('response-headers-content').innerHTML = '<p class="text-muted">Waiting for response...</p>';
+        }
+
+        function displayResponse(data) {
+            // Update status code
+            const statusCode = data.status_code;
+            document.getElementById('status-code').textContent = statusCode;
+            
+            let statusClass = 'bg-secondary';
+            if (statusCode >= 200 && statusCode < 300) {
+                statusClass = 'bg-success';
+            } else if (statusCode >= 300 && statusCode < 400) {
+                statusClass = 'bg-info';
+            } else if (statusCode >= 400 && statusCode < 500) {
+                statusClass = 'bg-warning';
+            } else if (statusCode >= 500) {
+                statusClass = 'bg-danger';
+            }
+            document.getElementById('status-code').className = `badge ${statusClass}`;
+            
+            // Update response time
+            document.getElementById('response-time').textContent = `${Math.round(data.time || 0)} ms`;
+            
+            // Update response body
+            const responseBodyContainer = document.getElementById('response-body-content');
+            responseBodyContainer.innerHTML = '';
+            
+            if (typeof data.body === 'object') {
+                // Check if JSONFormatter is available
+                if (typeof JSONFormatter === 'function') {
+                    try {
+                        const formatter = new JSONFormatter(data.body, 2, {
+                            hoverPreviewEnabled: true,
+                            hoverPreviewArrayCount: 100,
+                            hoverPreviewFieldCount: 5,
+                            theme: 'dark',
+                            animateOpen: true,
+                            animateClose: true
+                        });
+                        responseBodyContainer.appendChild(formatter.render());
+                    } catch (e) {
+                        const pre = document.createElement('pre');
+                        pre.textContent = JSON.stringify(data.body, null, 2);
+                        responseBodyContainer.appendChild(pre);
+                    }
+                } else {
+                    const pre = document.createElement('pre');
+                    pre.textContent = JSON.stringify(data.body, null, 2);
+                    responseBodyContainer.appendChild(pre);
+                }
+            } else {
+                const pre = document.createElement('pre');
+                pre.textContent = data.body;
+                responseBodyContainer.appendChild(pre);
+            }
+            
+            // Update response headers
+            const responseHeadersContainer = document.getElementById('response-headers-content');
+            responseHeadersContainer.innerHTML = '';
+            
+            // Check if JSONFormatter is available
+            if (typeof JSONFormatter === 'function') {
+                try {
+                    const formatter = new JSONFormatter(data.headers, 2);
+                    responseHeadersContainer.appendChild(formatter.render());
+                } catch (e) {
+                    const pre = document.createElement('pre');
+                    pre.textContent = JSON.stringify(data.headers, null, 2);
+                    responseHeadersContainer.appendChild(pre);
+                }
+            } else {
+                const pre = document.createElement('pre');
+                pre.textContent = JSON.stringify(data.headers, null, 2);
+                responseHeadersContainer.appendChild(pre);
+            }
+        }
 
         function getParams() {
             const params = {};
@@ -466,35 +549,28 @@
         }
 
         function updateQueryParams(url, params) {
-            const urlObj = new URL(url);
-            for (const [key, value] of Object.entries(params)) {
-                urlObj.searchParams.set(key, value);
+            try {
+                const urlObj = new URL(url);
+                for (const [key, value] of Object.entries(params)) {
+                    urlObj.searchParams.set(key, value);
+                }
+                return urlObj.toString();
+            } catch (e) {
+                console.error("Error updating URL parameters:", e);
+                return url;
             }
-            return urlObj.toString();
-        }
-
-        function formatJsonOutput(json) {
-            const formatter = new JSONFormatter(json, 2, {
-                hoverPreviewEnabled: true,
-                hoverPreviewArrayCount: 100,
-                hoverPreviewFieldCount: 5,
-                theme: 'dark',
-                animateOpen: true,
-                animateClose: true
-            });
-            
-            return formatter.render();
         }
 
         function sendRequest() {
-            const method = document.getElementById('method').value;
-            let url = document.getElementById('url').value.trim();
+            const method = document.getElementById('method-ajax').value;
+            let url = document.getElementById('url-ajax').value.trim();
             
             if (!url) {
                 alert('Please enter a URL');
                 return;
             }
             
+            // Add protocol if missing
             if (!url.startsWith('http://') && !url.startsWith('https://')) {
                 url = 'https://' + url;
             }
@@ -504,7 +580,7 @@
             const body = getBody();
             const auth = getAuth();
             
-            // Update URL with query params
+            // Update URL with query params for GET, HEAD, DELETE, OPTIONS
             if (method === 'GET' || method === 'HEAD' || method === 'DELETE' || method === 'OPTIONS') {
                 try {
                     url = updateQueryParams(url, params);
@@ -515,18 +591,19 @@
             }
             
             // Update status indicator
-            document.getElementById('status-code').textContent = 'Sending...';
-            document.getElementById('status-code').className = 'badge bg-secondary';
-            document.getElementById('response-time').textContent = '0 ms';
-            document.getElementById('response-body-content').innerHTML = '<p class="text-muted">Waiting for response...</p>';
-            document.getElementById('response-headers-content').innerHTML = '<p class="text-muted">Waiting for response...</p>';
+            updateResponse('Sending request...');
+            
+            console.log('Sending request to:', url);
+            console.log('Method:', method);
+            console.log('Headers:', headers);
+            console.log('Auth:', auth);
             
             // Send the request
             fetch('/api/send/', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                    'X-CSRFToken': csrfToken
                 },
                 body: JSON.stringify({
                     url: url,
@@ -537,50 +614,28 @@
                     auth: auth
                 })
             })
-            .then(response => response.json())
+            .then(response => {
+                console.log('Response received:', response);
+                if (!response.ok) {
+                    throw new Error('Server returned ' + response.status + ' ' + response.statusText);
+                }
+                return response.json();
+            })
             .then(data => {
-                // Update status code
-                const statusCode = data.status_code;
-                document.getElementById('status-code').textContent = statusCode;
-                
-                let statusClass = 'bg-secondary';
-                if (statusCode >= 200 && statusCode < 300) {
-                    statusClass = 'bg-success';
-                } else if (statusCode >= 300 && statusCode < 400) {
-                    statusClass = 'bg-info';
-                } else if (statusCode >= 400 && statusCode < 500) {
-                    statusClass = 'bg-warning';
-                } else if (statusCode >= 500) {
-                    statusClass = 'bg-danger';
-                }
-                document.getElementById('status-code').className = `badge ${statusClass}`;
-                
-                // Update response time
-                document.getElementById('response-time').textContent = `${Math.round(data.time)} ms`;
-                
-                // Update response body
-                const responseBodyContainer = document.getElementById('response-body-content');
-                responseBodyContainer.innerHTML = '';
-                
-                if (typeof data.body === 'object') {
-                    responseBodyContainer.appendChild(formatJsonOutput(data.body));
-                } else {
-                    responseBodyContainer.textContent = data.body;
-                }
-                
-                // Update response headers
-                const responseHeadersContainer = document.getElementById('response-headers-content');
-                responseHeadersContainer.innerHTML = '';
-                responseHeadersContainer.appendChild(formatJsonOutput(data.headers));
+                console.log('Data received:', data);
+                displayResponse(data);
             })
             .catch(error => {
+                console.error('Error:', error);
                 document.getElementById('status-code').textContent = 'Error';
                 document.getElementById('status-code').className = 'badge bg-danger';
-                document.getElementById('response-body-content').textContent = `Error: ${error.message}`;
+                document.getElementById('response-body-content').innerHTML = `<p class="text-danger">Error: ${error.message}</p>`;
+                document.getElementById('response-headers-content').innerHTML = `<p class="text-danger">Error: ${error.message}</p>`;
             });
         }
 
-        function saveRequest() {
+        // Save request to collection
+        document.getElementById('save-request-btn').addEventListener('click', function() {
             const name = document.getElementById('request-name').value.trim();
             const description = document.getElementById('request-description').value.trim();
             const collectionId = document.getElementById('collection-select').value;
@@ -595,8 +650,8 @@
                 return;
             }
             
-            const method = document.getElementById('method').value;
-            const url = document.getElementById('url').value.trim();
+            const method = document.getElementById('method-ajax').value;
+            const url = document.getElementById('url-ajax').value.trim();
             
             if (!url) {
                 alert('Please enter a URL');
@@ -611,38 +666,40 @@
                 headers: getHeaders(),
                 params: getParams(),
                 body: getBody(),
-                auth: getAuth(),
-                collection_id: collectionId
+                auth: getAuth()
             };
             
-            fetch('/collections/' + collectionId + '/requests/new/', {
+            fetch(`/collections/${collectionId}/requests/new/`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                    'X-CSRFToken': csrfToken
                 },
                 body: JSON.stringify(requestData)
             })
             .then(response => {
-                if (response.ok) {
-                    return response.json();
+                if (!response.ok) {
+                    throw new Error('Error saving request');
                 }
-                throw new Error('Error saving request');
+                return response.json();
             })
             .then(data => {
                 // Close modal
-                bootstrap.Modal.getInstance(document.getElementById('saveRequestModal')).hide();
+                const modal = bootstrap.Modal.getInstance(document.getElementById('saveRequestModal'));
+                modal.hide();
                 
                 // Show success message
                 alert('Request saved successfully!');
                 
                 // Optionally redirect to the new request
-                window.location.href = `/requests/${data.id}/`;
+                if (data && data.id) {
+                    window.location.href = `/requests/${data.id}/`;
+                }
             })
             .catch(error => {
                 alert('Error saving request: ' + error.message);
             });
-        }
+        });
     });
 </script>
 {% endblock %} 
