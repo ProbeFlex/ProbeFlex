@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% load crispy_forms_tags %}
+
+{% block title %}Delete {{ project.name }} - ProbeFlex{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0">
+    <div class="card border-0 shadow-sm">
+        <div class="card-body">
+            <h2 class="card-title mb-4">Delete Project</h2>
+            
+            <div class="alert alert-danger">
+                <h5 class="alert-heading">Warning! This action cannot be undone.</h5>
+                <p>You are about to delete project <strong>{{ project.name }}</strong> and all its collections, API requests, and history.</p>
+            </div>
+            
+            <form method="post">
+                {% csrf_token %}
+                
+                <div class="mt-4">
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash me-1"></i> Delete Project
+                    </button>
+                    <a href="{% url 'project_detail' project.id %}" class="btn btn-outline-secondary ms-2">
+                        Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %} 

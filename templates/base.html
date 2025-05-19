@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}ProbeFlex - API Testing Tool{% endblock %}</title>
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- JSON Formatter -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/json-formatter-js@2.3.4/dist/json-formatter.min.css">
+    
+    <style>
+        :root {
+            --sidebar-width: 280px;
+        }
+        body {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .sidebar {
+            width: var(--sidebar-width);
+            position: fixed;
+            top: 56px;
+            bottom: 0;
+            left: 0;
+            padding: 20px 0;
+            box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1);
+            overflow-y: auto;
+            background-color: #f8f9fa;
+            z-index: 999;
+        }
+        .main-content {
+            margin-left: var(--sidebar-width);
+            padding: 20px;
+            flex: 1;
+        }
+        .no-sidebar .main-content {
+            margin-left: 0;
+        }
+        .dropdown-menu {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .nav-link {
+            color: #495057;
+        }
+        .nav-link.active {
+            color: #0d6efd;
+            font-weight: 500;
+        }
+        .nav-pills .nav-link.active {
+            background-color: #0d6efd;
+            color: white;
+        }
+        .tree-nav .nav-link {
+            padding: .25rem 1rem;
+        }
+        .tree-nav .nav-item {
+            margin-left: 1rem;
+        }
+        .method-badge {
+            width: 70px;
+            display: inline-block;
+            text-align: center;
+        }
+        .request-history {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .response-container {
+            max-height: 600px;
+            overflow-y: auto;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            padding: 10px;
+        }
+        .tab-content {
+            padding-top: 1rem;
+        }
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+                position: static;
+                height: auto;
+            }
+            .main-content {
+                margin-left: 0;
+            }
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary fixed-top">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="{% url 'home' %}">
+                <img src="/static/img/logo.png" alt="ProbeFlex" height="30" class="d-inline-block align-text-top me-2">
+                ProbeFlex
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/home/' %}active{% endif %}" href="{% url 'home' %}">Home</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if '/projects/' in request.path %}active{% endif %}" href="{% url 'project_list' %}">Projects</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if '/teams/' in request.path %}active{% endif %}" href="{% url 'team_list' %}">Teams</a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav">
+                    {% if user.is_authenticated %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                            {{ user.username }}
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="{% url 'admin:index' %}">Admin</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{% url 'logout' %}">Logout</a></li>
+                        </ul>
+                    </li>
+                    {% else %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'login' %}">Login</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'signup' %}">Register</a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid{% if not user.is_authenticated %} no-sidebar{% endif %}" style="margin-top: 56px;">
+        <div class="row">
+            {% if user.is_authenticated and not hide_sidebar %}
+            <!-- Sidebar -->
+            <nav class="sidebar border-right d-none d-md-block">
+                <div class="p-3">
+                    <h5 class="mb-3">Projects</h5>
+                    <div class="tree-nav">
+                        <ul class="nav flex-column">
+                            {% for project in user.owned_projects.all %}
+                            <li class="nav-item">
+                                <a href="{% url 'project_detail' project.id %}" class="nav-link d-flex align-items-center">
+                                    <i class="fas fa-folder me-2"></i> {{ project.name }}
+                                </a>
+                                <ul class="nav flex-column">
+                                    {% for collection in project.collections.all %}
+                                    <li class="nav-item">
+                                        <a href="{% url 'collection_detail' collection.id %}" class="nav-link">
+                                            <i class="fas fa-layer-group me-2"></i> {{ collection.name }}
+                                        </a>
+                                        <ul class="nav flex-column">
+                                            {% for request in collection.requests.all %}
+                                            <li class="nav-item">
+                                                <a href="{% url 'request_detail' request.id %}" class="nav-link">
+                                                    <span class="method-badge badge bg-{{ request.method|lower }}">{{ request.method }}</span> 
+                                                    {{ request.name }}
+                                                </a>
+                                            </li>
+                                            {% endfor %}
+                                        </ul>
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    <div class="d-grid gap-2 mt-3">
+                        <a href="{% url 'project_create' %}" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-plus"></i> New Project
+                        </a>
+                    </div>
+                </div>
+            </nav>
+            {% endif %}
+
+            <!-- Main Content -->
+            <main class="{% if user.is_authenticated and not hide_sidebar %}main-content{% else %}col-12{% endif %}">
+                {% if messages %}
+                <div class="messages">
+                    {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="py-3 bg-light mt-auto">
+        <div class="container text-center">
+            <span class="text-muted">© {% now "Y" %} ProbeFlex - API Testing Tool</span>
+        </div>
+    </footer>
+
+    <!-- Bootstrap JS Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <!-- JSON Formatter -->
+    <script src="https://cdn.jsdelivr.net/npm/json-formatter-js@2.3.4/dist/json-formatter.min.js"></script>
+    
+    <script>
+        // Give GET, POST, etc. methods their appropriate colors
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.bg-get').forEach(el => el.classList.add('bg-success'));
+            document.querySelectorAll('.bg-post').forEach(el => el.classList.add('bg-primary'));
+            document.querySelectorAll('.bg-put').forEach(el => el.classList.add('bg-warning'));
+            document.querySelectorAll('.bg-patch').forEach(el => el.classList.add('bg-info'));
+            document.querySelectorAll('.bg-delete').forEach(el => el.classList.add('bg-danger'));
+            document.querySelectorAll('.bg-head').forEach(el => el.classList.add('bg-secondary'));
+            document.querySelectorAll('.bg-options').forEach(el => el.classList.add('bg-secondary'));
+        });
+    </script>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html> 

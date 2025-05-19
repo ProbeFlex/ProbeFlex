@@ -1,22 +1,54 @@
-"""
-URL configuration for probe_flex project.
-
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/5.2/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
-"""
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, include
+from django.contrib.auth import views as auth_views
+from django.views.generic import RedirectView
+from django.conf import settings
+from django.conf.urls.static import static
+
+from probe_app.views import (
+    CustomLoginView, SignUpView, home, send_request,
+    ProjectListView, ProjectDetailView, ProjectCreateView, ProjectUpdateView, ProjectDeleteView,
+    CollectionDetailView, CollectionCreateView,
+    APIRequestDetailView, APIRequestCreateView,
+    TeamListView, TeamDetailView, TeamCreateView
+)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    
+    # Authentication URLs
+    path('login/', CustomLoginView.as_view(), name='login'),
+    path('logout/', auth_views.LogoutView.as_view(), name='logout'),
+    path('signup/', SignUpView.as_view(), name='signup'),
+    
+    # Home and API testing
+    path('', RedirectView.as_view(url='/home/'), name='index'),
+    path('home/', home, name='home'),
+    path('api/send/', send_request, name='send_request'),
+    
+    # Project URLs
+    path('projects/', ProjectListView.as_view(), name='project_list'),
+    path('projects/new/', ProjectCreateView.as_view(), name='project_create'),
+    path('projects/<int:pk>/', ProjectDetailView.as_view(), name='project_detail'),
+    path('projects/<int:pk>/edit/', ProjectUpdateView.as_view(), name='project_update'),
+    path('projects/<int:pk>/delete/', ProjectDeleteView.as_view(), name='project_delete'),
+    
+    # Collection URLs
+    path('projects/<int:project_id>/collections/new/', CollectionCreateView.as_view(), name='collection_create'),
+    path('collections/<int:pk>/', CollectionDetailView.as_view(), name='collection_detail'),
+    
+    # API Request URLs
+    path('collections/<int:collection_id>/requests/new/', APIRequestCreateView.as_view(), name='request_create'),
+    path('requests/<int:pk>/', APIRequestDetailView.as_view(), name='request_detail'),
+    
+    # Team URLs
+    path('teams/', TeamListView.as_view(), name='team_list'),
+    path('teams/new/', TeamCreateView.as_view(), name='team_create'),
+    path('teams/<int:pk>/', TeamDetailView.as_view(), name='team_detail'),
+    
+    # Include Django AllAuth URLs
+    path('accounts/', include('allauth.urls')),
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

@@ -3,3 +3,9 @@ requests==2.32.3
 django-htmlmin==0.11.0
 django-compressor==4.5.1
 python-dateutil==2.9.0.post0
+django-crispy-forms==2.4
+crispy-bootstrap5==2025.4
+djangorestframework==3.16.0
+celery==5.5.2
+redis==6.1.0
+django-allauth==65.8.0

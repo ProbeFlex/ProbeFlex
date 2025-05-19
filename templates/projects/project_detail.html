@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% load crispy_forms_tags %}
+
+{% block title %}{{ project.name }} - ProbeFlex{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>{{ project.name }}</h2>
+        <div>
+            {% if project.owner == user %}
+            <a href="{% url 'project_update' project.id %}" class="btn btn-outline-secondary">
+                <i class="fas fa-edit me-1"></i> Edit Project
+            </a>
+            {% endif %}
+            <a href="{% url 'project_list' %}" class="btn btn-outline-primary ms-2">
+                <i class="fas fa-arrow-left me-1"></i> Back to Projects
+            </a>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-8">
+                    <h5>Description</h5>
+                    <p>
+                        {% if project.description %}
+                        {{ project.description }}
+                        {% else %}
+                        <span class="text-muted">No description provided.</span>
+                        {% endif %}
+                    </p>
+                </div>
+                <div class="col-md-4">
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <p><strong>Owner:</strong> {{ project.owner.username }}</p>
+                            <p><strong>Created:</strong> {{ project.created_at|date:"F j, Y" }}</p>
+                            <p><strong>Last Updated:</strong> {{ project.updated_at|date:"F j, Y" }}</p>
+                            <p><strong>Collections:</strong> {{ collections|length }}</p>
+                            
+                            {% if project.teams.exists %}
+                            <p><strong>Teams with Access:</strong></p>
+                            <ul>
+                                {% for team in project.teams.all %}
+                                <li>{{ team.name }}</li>
+                                {% endfor %}
+                            </ul>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3>Collections</h3>
+        <a href="{% url 'collection_create' project.id %}" class="btn btn-primary btn-sm">
+            <i class="fas fa-plus me-1"></i> New Collection
+        </a>
+    </div>
+
+    {% if collections %}
+    <div class="row">
+        {% for collection in collections %}
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">{{ collection.name }}</h5>
+                    <p class="card-text text-muted small">
+                        {% if collection.description %}
+                        {{ collection.description|truncatechars:100 }}
+                        {% else %}
+                        No description provided.
+                        {% endif %}
+                    </p>
+                    <div class="d-flex justify-content-between align-items-center mt-3">
+                        <div class="text-muted small">
+                            <i class="fas fa-code me-1"></i> {{ collection.requests.count }} Requests
+                        </div>
+                        <div class="text-muted small">
+                            Created {{ collection.created_at|date:"M d, Y" }}
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer bg-white border-top-0">
+                    <a href="{% url 'collection_detail' collection.id %}" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-eye me-1"></i> View
+                    </a>
+                    <a href="{% url 'request_create' collection.id %}" class="btn btn-sm btn-outline-secondary">
+                        <i class="fas fa-plus me-1"></i> Add Request
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+        <p>This project doesn't have any collections yet. <a href="{% url 'collection_create' project.id %}">Create a collection</a> to start organizing your API requests.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %} 
