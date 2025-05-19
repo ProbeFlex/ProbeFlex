@@ -9,11 +9,18 @@
 
 <!-- Add CSS for response containers -->
 <style>
+    :root {
+        --primary-color: #00396b;
+        --primary-light-color: #0056a1;
+        --primary-dark-color: #002548;
+        --secondary-light-color: #e9ecef;
+    }
+
     .response-container {
         max-height: 500px;
         overflow-y: auto;
         overflow-x: auto;
-        background-color: #f8f9fa;
+        background-color: var(--secondary-light-color);
         border-radius: 4px;
         padding: 10px;
     }
@@ -41,6 +48,60 @@
     .text-danger {
         color: #dc3545 !important;
         font-weight: bold;
+    }
+    
+    /* Custom styling for buttons to match theme */
+    .btn-primary {
+        background-color: var(--primary-color);
+        border-color: var(--primary-color);
+    }
+    
+    .btn-primary:hover {
+        background-color: var(--primary-light-color);
+        border-color: var(--primary-light-color);
+    }
+    
+    .btn-outline-primary {
+        color: var(--primary-color);
+        border-color: var(--primary-color);
+    }
+    
+    .btn-outline-primary:hover {
+        background-color: var(--primary-color);
+        border-color: var(--primary-color);
+    }
+    
+    /* Status badges with new color scheme */
+    .badge.bg-success {
+        background-color: #28a745 !important;
+    }
+    
+    .badge.bg-info {
+        background-color: #17a2b8 !important;
+        color: white;
+    }
+    
+    .badge.bg-warning {
+        background-color: #ffc107 !important;
+        color: #212529;
+    }
+    
+    .badge.bg-danger {
+        background-color: #dc3545 !important;
+    }
+    
+    .badge.bg-secondary {
+        background-color: #6c757d !important;
+    }
+    
+    /* Nav tabs customization */
+    .nav-tabs .nav-link.active {
+        color: var(--primary-color);
+        font-weight: 500;
+    }
+    
+    .nav-tabs .nav-link {
+        color: #495057;
     }
 </style>
 

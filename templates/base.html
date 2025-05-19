@@ -15,6 +15,10 @@
     <style>
         :root {
             --sidebar-width: 280px;
+            --primary-color: #00396b;
+            --primary-light-color: #0056a1;
+            --primary-dark-color: #002548;
+            --secondary-light-color: #e9ecef;
         }
         body {
             min-height: 100vh;
@@ -49,11 +53,11 @@
             color: #495057;
         }
         .nav-link.active {
-            color: #0d6efd;
+            color: var(--primary-color);
             font-weight: 500;
         }
         .nav-pills .nav-link.active {
-            background-color: #0d6efd;
+            background-color: var(--primary-color);
             color: white;
         }
         .tree-nav .nav-link {
@@ -80,6 +84,34 @@
         }
         .tab-content {
             padding-top: 1rem;
+        }
+        /* Custom navbar color */
+        .navbar.bg-primary {
+            background-color: var(--primary-color) !important;
+        }
+        /* Custom button colors */
+        .btn-primary {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+        .btn-primary:hover {
+            background-color: var(--primary-light-color);
+            border-color: var(--primary-light-color);
+        }
+        .btn-outline-primary {
+            color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+        .btn-outline-primary:hover {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+        /* Adjust dropdown text color for better contrast */
+        .navbar-dark .navbar-nav .nav-link {
+            color: rgba(255, 255, 255, 0.9);
+        }
+        .navbar-dark .navbar-nav .nav-link:hover {
+            color: #ffffff;
         }
         @media (max-width: 768px) {
             .sidebar {
