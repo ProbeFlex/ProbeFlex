@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="ProbeFlex.png" alt="ProbeFlex Logo" width="220"/>
+  <img src="probe-flex.png" alt="ProbeFlex Logo" width="220"/>
 </p>
 
 ---
@@ -54,9 +54,6 @@ Open **`http://127.0.0.1:8000/`** → log in with `demo / demo123` to explore th
 | ----------------- | ------------------------------------------------------------------------------------------------ |
 | **Live Testing**  | Curl-like request builder, environment variables, authentication helpers (Bearer, OAuth2, HMAC).  |
 | **Test Suite**    | YAML / UI writer, rich validations (`status_code`, JSONPath, regex, latency), parameterized runs. |
-| **Scheduler**     | Cron-style or push triggers (GitHub/GitLab CI).                                                  |
-| **Load Lab**      | k6-compatible scripts, distributed Celery queue, Grafana exporter.                               |
-| **Observability** | Prometheus metrics, OpenTelemetry traces, Slack / Discord alerts.                                |
 | **Integrations**  | Postman collection import, pytest plugin, GitHub Checks annotations.                              |
 
 ---
@@ -65,7 +62,7 @@ Open **`http://127.0.0.1:8000/`** → log in with `demo / demo123` to explore th
 
 ```
              ┌────────────┐
-             │  Frontend  │  (Next.js UI, Tailwind, SWR)
+             │  Frontend  │
              └─────┬──────┘
                    │ REST / WebSocket
 ┌──────────────────┼───────────────────────────────────────────────┐
@@ -75,7 +72,7 @@ Open **`http://127.0.0.1:8000/`** → log in with `demo / demo123` to explore th
 │  │  • parser / validator     │ <──────> │  • run steps         │ │
 │  │  • assertion DSL          │          │  • notify hooks      │ │
 │  └─────────────┬─────────────┘          └────────────┬─────────┘ │
-│        PostgreSQL                     Redis (broker/TTL metrics) │
+│        Sqlite or PostgreSQL           Redis (broker/TTL metrics) │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -83,35 +80,9 @@ Open **`http://127.0.0.1:8000/`** → log in with `demo / demo123` to explore th
 
 ## 🛠️ Tech Stack
 
-* **Backend:** Django 5, Django REST Framework, Celery, Redis
-* **Database:** PostgreSQL 15
-* **Task Runner:** Celery + RabbitMQ/Redis (default Redis)
-* **CI/CD:** GitHub Actions + Docker Compose
-* **Observability:** Prometheus, Grafana, Sentry (optional)
-* **Packaging:** Poetry + PEP 517 wheel; PyPI: `probeflex`
-
----
-
-## 🗺️ Roadmap
-
-* [ ] GraphQL sandbox and tests
-* [ ] gRPC testing + protobuf validation helpers
-* [ ] AI-powered test suggestions (OpenAI function-calling)
-* [ ] Multi-tenant SaaS mode
-* [ ] k6 cloud export
-
----
-
-## 🤝 Contributing
-
-We 💚 PRs!
-
-1. Fork and create a branch from `main`
-2. `poetry install` / `pre-commit install`
-3. Add tests (`pytest`) and run `make check`
-4. Submit PR - CI will run lint, unit and integration tests
-
-Check **CONTRIBUTING.md** for coding guidelines and commit conventions (Conventional Commits).
+* **Backend:** Django 5.2, Django REST Framework, Celery, Redis
+* **Database:** Sqlite and PostgreSQL
+* **Task Runner:** Celery + Redis (default Redis)
 
 ---
 
