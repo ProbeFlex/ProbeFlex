@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% load crispy_forms_tags %}
+
+{% block title %}{{ collection.name }} - ProbeFlex{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>{{ collection.name }}</h2>
+        <div>
+            <a href="{% url 'project_detail' collection.project.id %}" class="btn btn-outline-primary">
+                <i class="fas fa-arrow-left me-1"></i> Back to Project
+            </a>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-8">
+                    <h5>Description</h5>
+                    <p>
+                        {% if collection.description %}
+                        {{ collection.description }}
+                        {% else %}
+                        <span class="text-muted">No description provided.</span>
+                        {% endif %}
+                    </p>
+                </div>
+                <div class="col-md-4">
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <p><strong>Project:</strong> {{ collection.project.name }}</p>
+                            <p><strong>Created:</strong> {{ collection.created_at|date:"F j, Y" }}</p>
+                            <p><strong>Last Updated:</strong> {{ collection.updated_at|date:"F j, Y" }}</p>
+                            <p><strong>Requests:</strong> {{ requests|length }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3>API Requests</h3>
+        <a href="{% url 'request_create' collection.id %}" class="btn btn-primary btn-sm">
+            <i class="fas fa-plus me-1"></i> New API Request
+        </a>
+    </div>
+
+    {% if requests %}
+    <div class="card border-0 shadow-sm">
+        <div class="table-responsive">
+            <table class="table mb-0">
+                <thead>
+                    <tr>
+                        <th>Method</th>
+                        <th>Name</th>
+                        <th>URL</th>
+                        <th>Last Updated</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for request in requests %}
+                    <tr>
+                        <td>
+                            <span class="badge bg-{{ request.method|lower }}">{{ request.method }}</span>
+                        </td>
+                        <td>{{ request.name }}</td>
+                        <td class="text-truncate" style="max-width: 300px;">{{ request.url }}</td>
+                        <td>{{ request.updated_at|date:"M d, Y" }}</td>
+                        <td>
+                            <a href="{% url 'request_detail' request.id %}" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+        <p>This collection doesn't have any API requests yet. <a href="{% url 'request_create' collection.id %}">Create a request</a> to start testing APIs.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %} 

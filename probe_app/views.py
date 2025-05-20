@@ -274,6 +274,11 @@ class CollectionCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
         form.instance.project = project
         return super().form_valid(form)
     
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['project_id'] = self.kwargs.get('project_id')
+        return context
+    
     def get_success_url(self):
         return reverse_lazy('project_detail', kwargs={'pk': self.kwargs.get('project_id')})
 
@@ -315,6 +320,11 @@ class APIRequestCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
         collection = get_object_or_404(Collection, id=collection_id)
         form.instance.collection = collection
         return super().form_valid(form)
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['collection_id'] = self.kwargs.get('collection_id')
+        return context
     
     def get_success_url(self):
         return reverse_lazy('collection_detail', kwargs={'pk': self.kwargs.get('collection_id')})

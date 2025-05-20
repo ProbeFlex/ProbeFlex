@@ -1,0 +1,301 @@
+{% extends "base.html" %}
+{% load crispy_forms_tags %}
+
+{% block title %}{{ request.name }} - ProbeFlex{% endblock %}
+
+{% block content %}
+<!-- Add CSRF token for AJAX requests -->
+{% csrf_token %}
+
+<div class="container-fluid px-0">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2>{{ request.name }}</h2>
+            <div class="text-muted">
+                <span class="badge bg-{{ request.method|lower }}">{{ request.method }}</span>
+                {{ request.url }}
+            </div>
+        </div>
+        <div>
+            <a href="{% url 'collection_detail' request.collection.id %}" class="btn btn-outline-primary">
+                <i class="fas fa-arrow-left me-1"></i> Back to Collection
+            </a>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white">
+            <ul class="nav nav-tabs card-header-tabs" id="requestTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="details-tab" data-bs-toggle="tab" data-bs-target="#details" type="button" role="tab">Details</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="headers-tab" data-bs-toggle="tab" data-bs-target="#headers" type="button" role="tab">Headers</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="params-tab" data-bs-toggle="tab" data-bs-target="#params" type="button" role="tab">Params</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="body-tab" data-bs-toggle="tab" data-bs-target="#body" type="button" role="tab">Body</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="history-tab" data-bs-toggle="tab" data-bs-target="#history" type="button" role="tab">History</button>
+                </li>
+            </ul>
+        </div>
+        <div class="card-body">
+            <div class="tab-content">
+                <div class="tab-pane fade show active" id="details" role="tabpanel">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5>Description</h5>
+                            <p>
+                                {% if request.description %}
+                                {{ request.description }}
+                                {% else %}
+                                <span class="text-muted">No description provided.</span>
+                                {% endif %}
+                            </p>
+                            <div class="d-grid gap-2 d-md-block">
+                                <button class="btn btn-primary" id="send-btn">
+                                    <i class="fas fa-paper-plane me-1"></i> Send Request
+                                </button>
+                                <a href="#" class="btn btn-outline-secondary">
+                                    <i class="fas fa-edit me-1"></i> Edit Request
+                                </a>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <p><strong>Collection:</strong> {{ request.collection.name }}</p>
+                                    <p><strong>Project:</strong> {{ request.collection.project.name }}</p>
+                                    <p><strong>Created:</strong> {{ request.created_at|date:"F j, Y" }}</p>
+                                    <p><strong>Last Updated:</strong> {{ request.updated_at|date:"F j, Y" }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="tab-pane fade" id="headers" role="tabpanel">
+                    {% if request.headers %}
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Key</th>
+                                <th>Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for key, value in request.headers.items %}
+                            <tr>
+                                <td>{{ key }}</td>
+                                <td>{{ value }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <p class="text-muted">No headers configured.</p>
+                    {% endif %}
+                </div>
+                <div class="tab-pane fade" id="params" role="tabpanel">
+                    {% if request.params %}
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Key</th>
+                                <th>Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for key, value in request.params.items %}
+                            <tr>
+                                <td>{{ key }}</td>
+                                <td>{{ value }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <p class="text-muted">No parameters configured.</p>
+                    {% endif %}
+                </div>
+                <div class="tab-pane fade" id="body" role="tabpanel">
+                    {% if request.body %}
+                    <pre class="bg-light p-3 rounded"><code>{{ request.body|pprint }}</code></pre>
+                    {% else %}
+                    <p class="text-muted">No request body configured.</p>
+                    {% endif %}
+                </div>
+                <div class="tab-pane fade" id="history" role="tabpanel">
+                    {% if history %}
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Status</th>
+                                    <th>Response Time</th>
+                                    <th>Executed By</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for entry in history %}
+                                <tr>
+                                    <td>{{ entry.executed_at|date:"M d, Y H:i:s" }}</td>
+                                    <td>
+                                        <span class="badge {% if entry.response_status < 400 %}bg-success{% elif entry.response_status < 500 %}bg-warning{% else %}bg-danger{% endif %}">
+                                            {{ entry.response_status }}
+                                        </span>
+                                    </td>
+                                    <td>{{ entry.response_time|floatformat:2 }} ms</td>
+                                    <td>{{ entry.executed_by.username }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted">No execution history yet. Send a request to see results.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Response Section -->
+    <div class="card mt-3 border-0 shadow-sm">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Response</h5>
+            <div>
+                <span id="status-code" class="badge bg-secondary">Waiting for response</span>
+                <span id="response-time" class="ms-2">0 ms</span>
+            </div>
+        </div>
+        <div class="card-body">
+            <ul class="nav nav-tabs" id="responseTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="response-body-tab" data-bs-toggle="tab" data-bs-target="#response-body" type="button" role="tab">Body</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="response-headers-tab" data-bs-toggle="tab" data-bs-target="#response-headers" type="button" role="tab">Headers</button>
+                </li>
+            </ul>
+
+            <div class="tab-content">
+                <div class="tab-pane fade show active" id="response-body" role="tabpanel">
+                    <div class="response-container mt-3" id="response-body-content">
+                        <p class="text-muted">Send a request to see the response</p>
+                    </div>
+                </div>
+                <div class="tab-pane fade" id="response-headers" role="tabpanel">
+                    <div class="response-container mt-3" id="response-headers-content">
+                        <p class="text-muted">Send a request to see the response headers</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        
+        document.getElementById('send-btn').addEventListener('click', function() {
+            // Update status indicator
+            document.getElementById('status-code').textContent = 'Processing...';
+            document.getElementById('status-code').className = 'badge bg-secondary';
+            document.getElementById('response-time').textContent = '0 ms';
+            document.getElementById('response-body-content').innerHTML = '<p class="text-muted">Sending request...</p>';
+            document.getElementById('response-headers-content').innerHTML = '<p class="text-muted">Waiting for response...</p>';
+            
+            fetch('/api/send/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({
+                    url: '{{ request.url }}',
+                    method: '{{ request.method }}',
+                    headers: {{ request.headers|safe }},
+                    params: {{ request.params|safe }},
+                    body: {{ request.body|safe|default:'{}' }},
+                    auth: {{ request.auth|safe|default:'{}' }},
+                    api_request_id: {{ request.id }}
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Server returned ' + response.status + ' ' + response.statusText);
+                }
+                return response.json();
+            })
+            .then(data => {
+                // Update status code
+                const statusCode = data.status_code;
+                document.getElementById('status-code').textContent = statusCode;
+                
+                let statusClass = 'bg-secondary';
+                if (statusCode >= 200 && statusCode < 300) {
+                    statusClass = 'bg-success';
+                } else if (statusCode >= 300 && statusCode < 400) {
+                    statusClass = 'bg-info';
+                } else if (statusCode >= 400 && statusCode < 500) {
+                    statusClass = 'bg-warning';
+                } else if (statusCode >= 500) {
+                    statusClass = 'bg-danger';
+                }
+                document.getElementById('status-code').className = `badge ${statusClass}`;
+                
+                // Update response time
+                document.getElementById('response-time').textContent = `${Math.round(data.time || 0)} ms`;
+                
+                // Update response body
+                const responseBodyContainer = document.getElementById('response-body-content');
+                responseBodyContainer.innerHTML = '';
+                
+                if (typeof data.body === 'object') {
+                    const pre = document.createElement('pre');
+                    pre.textContent = JSON.stringify(data.body, null, 2);
+                    responseBodyContainer.appendChild(pre);
+                } else {
+                    const pre = document.createElement('pre');
+                    pre.textContent = data.body;
+                    responseBodyContainer.appendChild(pre);
+                }
+                
+                // Update response headers
+                const responseHeadersContainer = document.getElementById('response-headers-content');
+                responseHeadersContainer.innerHTML = '';
+                const headersContent = document.createElement('pre');
+                headersContent.textContent = JSON.stringify(data.headers, null, 2);
+                responseHeadersContainer.appendChild(headersContent);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('status-code').textContent = 'Error';
+                document.getElementById('status-code').className = 'badge bg-danger';
+                
+                const errorBodyContainer = document.getElementById('response-body-content');
+                errorBodyContainer.innerHTML = '';
+                const errorBodyMessage = document.createElement('div');
+                errorBodyMessage.className = 'alert alert-danger';
+                errorBodyMessage.textContent = 'Error: ' + error.message;
+                errorBodyContainer.appendChild(errorBodyMessage);
+                
+                const errorHeadersContainer = document.getElementById('response-headers-content');
+                errorHeadersContainer.innerHTML = '';
+                const errorHeadersMessage = document.createElement('div');
+                errorHeadersMessage.className = 'alert alert-danger';
+                errorHeadersMessage.textContent = 'Error: ' + error.message;
+                errorHeadersContainer.appendChild(errorHeadersMessage);
+            });
+        });
+    });
+</script>
+{% endblock %} 
