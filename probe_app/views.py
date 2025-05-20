@@ -82,8 +82,11 @@ def send_request(request):
             params = data.get('params', {})
             request_body = data.get('body', {})
             auth_data = data.get('auth', {})
+            follow_redirects = data.get('follow_redirects', True)
+            verify_ssl = data.get('verify_ssl', True)
             
             print(f"Processing request: {method} {url}")
+            print(f"Verify SSL: {verify_ssl}")
             
             auth = None
             if auth_data.get('type') == 'basic':
@@ -91,20 +94,32 @@ def send_request(request):
             
             start_time = time.time()
             
+            request_kwargs = {
+                'headers': headers,
+                'params': params,
+                'auth': auth,
+                'verify': verify_ssl,
+                'allow_redirects': follow_redirects
+            }
+            
+            # Add json body for methods that support it
+            if method in ['POST', 'PUT', 'PATCH']:
+                request_kwargs['json'] = request_body
+            
             if method == 'GET':
-                response = requests.get(url, headers=headers, params=params, auth=auth)
+                response = requests.get(url, **request_kwargs)
             elif method == 'POST':
-                response = requests.post(url, headers=headers, params=params, json=request_body, auth=auth)
+                response = requests.post(url, **request_kwargs)
             elif method == 'PUT':
-                response = requests.put(url, headers=headers, params=params, json=request_body, auth=auth)
+                response = requests.put(url, **request_kwargs)
             elif method == 'PATCH':
-                response = requests.patch(url, headers=headers, params=params, json=request_body, auth=auth)
+                response = requests.patch(url, **request_kwargs)
             elif method == 'DELETE':
-                response = requests.delete(url, headers=headers, params=params, auth=auth)
+                response = requests.delete(url, **request_kwargs)
             elif method == 'HEAD':
-                response = requests.head(url, headers=headers, params=params, auth=auth)
+                response = requests.head(url, **request_kwargs)
             elif method == 'OPTIONS':
-                response = requests.options(url, headers=headers, params=params, auth=auth)
+                response = requests.options(url, **request_kwargs)
             else:
                 return JsonResponse({'error': 'Invalid HTTP method'}, status=400)
             

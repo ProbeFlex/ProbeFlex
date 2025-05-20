@@ -284,6 +284,14 @@
                                 </label>
                             </div>
                         </div>
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="verify-ssl" checked>
+                                <label class="form-check-label" for="verify-ssl">
+                                    Verify SSL Certificates
+                                </label>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -685,6 +693,8 @@
             const headers = getHeaders();
             const body = getBody();
             const auth = getAuth();
+            const followRedirects = document.getElementById('follow-redirects').checked;
+            const verifySSL = document.getElementById('verify-ssl').checked;
             
             // Update URL with query params for GET, HEAD, DELETE, OPTIONS
             if (method === 'GET' || method === 'HEAD' || method === 'DELETE' || method === 'OPTIONS') {
@@ -703,6 +713,7 @@
             console.log('Method:', method);
             console.log('Headers:', headers);
             console.log('Auth:', auth);
+            console.log('Verify SSL:', verifySSL);
             
             // Send the request
             fetch('/api/send/', {
@@ -717,7 +728,9 @@
                     params: params,
                     headers: headers,
                     body: body,
-                    auth: auth
+                    auth: auth,
+                    follow_redirects: followRedirects,
+                    verify_ssl: verifySSL
                 })
             })
             .then(response => {
