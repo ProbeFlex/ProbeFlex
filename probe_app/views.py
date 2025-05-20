@@ -319,6 +319,22 @@ class APIRequestCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
         collection_id = self.kwargs.get('collection_id')
         collection = get_object_or_404(Collection, id=collection_id)
         form.instance.collection = collection
+        
+        # Set additional fields from hidden form inputs
+        form.instance.url = self.request.POST.get('url', '')
+        form.instance.method = self.request.POST.get('method', 'GET')
+        
+        # Handle JSON fields
+        form.instance.headers = json.loads(self.request.POST.get('headers', '{}'))
+        form.instance.params = json.loads(self.request.POST.get('params', '{}'))
+        form.instance.body = json.loads(self.request.POST.get('body', '{}'))
+        form.instance.auth = json.loads(self.request.POST.get('auth', '{}'))
+        
+        # Handle additional request settings
+        form.instance.timeout = int(self.request.POST.get('timeout', 30000))
+        form.instance.follow_redirects = self.request.POST.get('follow_redirects', 'true').lower() == 'true'
+        form.instance.verify_ssl = self.request.POST.get('verify_ssl', 'true').lower() == 'true'
+        
         return super().form_valid(form)
     
     def get_context_data(self, **kwargs):

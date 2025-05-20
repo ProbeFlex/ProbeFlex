@@ -70,6 +70,9 @@ class APIRequest(models.Model):
     params = models.JSONField(default=dict)
     body = models.JSONField(default=dict, blank=True, null=True)
     auth = models.JSONField(default=dict, blank=True, null=True)
+    timeout = models.IntegerField(default=30000)  # Timeout in milliseconds
+    follow_redirects = models.BooleanField(default=True)
+    verify_ssl = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     collection = models.ForeignKey(Collection, on_delete=models.CASCADE, related_name='requests')

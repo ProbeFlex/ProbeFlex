@@ -4,6 +4,9 @@
 {% block title %}{% if form.instance.pk %}Edit API Request{% else %}New API Request{% endif %} - ProbeFlex{% endblock %}
 
 {% block content %}
+<!-- Add CSRF token for AJAX requests -->
+{% csrf_token %}
+
 <div class="container-fluid px-0">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>{% if form.instance.pk %}Edit API Request{% else %}New API Request{% endif %}</h2>
@@ -12,16 +15,250 @@
         </a>
     </div>
 
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+            <div class="input-group mb-3">
+                <select class="form-select flex-grow-0" style="width: 120px;" id="method-ajax">
+                    <option value="GET">GET</option>
+                    <option value="POST">POST</option>
+                    <option value="PUT">PUT</option>
+                    <option value="PATCH">PATCH</option>
+                    <option value="DELETE">DELETE</option>
+                    <option value="HEAD">HEAD</option>
+                    <option value="OPTIONS">OPTIONS</option>
+                </select>
+                <input type="text" class="form-control" id="url-ajax" placeholder="Enter URL (e.g. https://api.example.com/v1/endpoint)">
+                <button class="btn btn-primary" id="send-btn-ajax">Send</button>
+            </div>
+
+            <ul class="nav nav-tabs" id="requestTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="params-tab" data-bs-toggle="tab" data-bs-target="#params" type="button" role="tab" aria-controls="params" aria-selected="true">Params</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="auth-tab" data-bs-toggle="tab" data-bs-target="#auth" type="button" role="tab" aria-controls="auth" aria-selected="false">Auth</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="headers-tab" data-bs-toggle="tab" data-bs-target="#headers" type="button" role="tab" aria-controls="headers" aria-selected="false">Headers</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="body-tab" data-bs-toggle="tab" data-bs-target="#body" type="button" role="tab" aria-controls="body" aria-selected="false">Body</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="settings-tab" data-bs-toggle="tab" data-bs-target="#settings" type="button" role="tab" aria-controls="settings" aria-selected="false">Settings</button>
+                </li>
+            </ul>
+
+            <div class="tab-content" id="requestTabsContent">
+                <!-- Params Tab -->
+                <div class="tab-pane fade show active" id="params" role="tabpanel" aria-labelledby="params-tab">
+                    <div class="param-rows mt-3">
+                        <div class="row mb-2">
+                            <div class="col-5">
+                                <input type="text" class="form-control param-key" placeholder="Key">
+                            </div>
+                            <div class="col-5">
+                                <input type="text" class="form-control param-value" placeholder="Value">
+                            </div>
+                            <div class="col-2">
+                                <button class="btn btn-sm btn-outline-danger remove-param">Remove</button>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="btn btn-sm btn-outline-primary mt-2" id="add-param">Add Parameter</button>
+                </div>
+
+                <!-- Auth Tab -->
+                <div class="tab-pane fade" id="auth" role="tabpanel" aria-labelledby="auth-tab">
+                    <div class="mt-3">
+                        <select class="form-select" id="auth-type">
+                            <option value="none">No Auth</option>
+                            <option value="basic">Basic Auth</option>
+                            <option value="bearer">Bearer Token</option>
+                            <option value="apikey">API Key</option>
+                        </select>
+
+                        <div class="mt-3 auth-details" id="basic-auth-details" style="display: none;">
+                            <div class="mb-3">
+                                <label for="basic-username" class="form-label">Username</label>
+                                <input type="text" class="form-control" id="basic-username">
+                            </div>
+                            <div class="mb-3">
+                                <label for="basic-password" class="form-label">Password</label>
+                                <input type="password" class="form-control" id="basic-password">
+                            </div>
+                        </div>
+
+                        <div class="mt-3 auth-details" id="bearer-auth-details" style="display: none;">
+                            <div class="mb-3">
+                                <label for="bearer-token" class="form-label">Token</label>
+                                <input type="text" class="form-control" id="bearer-token">
+                            </div>
+                        </div>
+
+                        <div class="mt-3 auth-details" id="apikey-auth-details" style="display: none;">
+                            <div class="mb-3">
+                                <label for="apikey-name" class="form-label">Key Name</label>
+                                <input type="text" class="form-control" id="apikey-name">
+                            </div>
+                            <div class="mb-3">
+                                <label for="apikey-value" class="form-label">Key Value</label>
+                                <input type="text" class="form-control" id="apikey-value">
+                            </div>
+                            <div class="mb-3">
+                                <label for="apikey-location" class="form-label">Add to</label>
+                                <select class="form-control" id="apikey-location">
+                                    <option value="header">Header</option>
+                                    <option value="query">Query Parameter</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Headers Tab -->
+                <div class="tab-pane fade" id="headers" role="tabpanel" aria-labelledby="headers-tab">
+                    <div class="header-rows mt-3">
+                        <div class="row mb-2">
+                            <div class="col-5">
+                                <input type="text" class="form-control header-key" placeholder="Key">
+                            </div>
+                            <div class="col-5">
+                                <input type="text" class="form-control header-value" placeholder="Value">
+                            </div>
+                            <div class="col-2">
+                                <button class="btn btn-sm btn-outline-danger remove-header">Remove</button>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="btn btn-sm btn-outline-primary mt-2" id="add-header">Add Header</button>
+                </div>
+
+                <!-- Body Tab -->
+                <div class="tab-pane fade" id="body" role="tabpanel" aria-labelledby="body-tab">
+                    <div class="mt-3">
+                        <select class="form-select mb-3" id="body-type">
+                            <option value="none">No Body</option>
+                            <option value="json">JSON</option>
+                            <option value="form">Form Data</option>
+                            <option value="raw">Raw</option>
+                        </select>
+
+                        <div class="body-inputs" id="json-body" style="display: none;">
+                            <textarea class="form-control" id="json-editor" rows="10" placeholder='{ "key": "value" }'></textarea>
+                        </div>
+
+                        <div class="body-inputs" id="form-body" style="display: none;">
+                            <div class="form-rows">
+                                <div class="row mb-2">
+                                    <div class="col-5">
+                                        <input type="text" class="form-control form-key" placeholder="Key">
+                                    </div>
+                                    <div class="col-5">
+                                        <input type="text" class="form-control form-value" placeholder="Value">
+                                    </div>
+                                    <div class="col-2">
+                                        <button class="btn btn-sm btn-outline-danger remove-form-item">Remove</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <button class="btn btn-sm btn-outline-primary mt-2" id="add-form-item">Add Form Item</button>
+                        </div>
+
+                        <div class="body-inputs" id="raw-body" style="display: none;">
+                            <textarea class="form-control" id="raw-editor" rows="10" placeholder="Raw request body"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Settings Tab -->
+                <div class="tab-pane fade" id="settings" role="tabpanel" aria-labelledby="settings-tab">
+                    <div class="mt-3">
+                        <div class="mb-3">
+                            <label for="timeout" class="form-label">Request Timeout (ms)</label>
+                            <input type="number" class="form-control" id="timeout" value="30000">
+                        </div>
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="follow-redirects" checked>
+                                <label class="form-check-label" for="follow-redirects">
+                                    Follow Redirects
+                                </label>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="verify-ssl" checked>
+                                <label class="form-check-label" for="verify-ssl">
+                                    Verify SSL Certificates
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Response Section -->
+    <div class="card mt-3 border-0 shadow-sm mb-4">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Response</h5>
+            <div>
+                <span id="status-code" class="badge bg-secondary">Waiting for response</span>
+                <span id="response-time" class="ms-2">0 ms</span>
+            </div>
+        </div>
+        <div class="card-body">
+            <ul class="nav nav-tabs" id="responseTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="response-body-tab" data-bs-toggle="tab" data-bs-target="#response-body" type="button" role="tab">Body</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="response-headers-tab" data-bs-toggle="tab" data-bs-target="#response-headers" type="button" role="tab">Headers</button>
+                </li>
+            </ul>
+
+            <div class="tab-content" id="responseTabsContent">
+                <div class="tab-pane fade show active" id="response-body" role="tabpanel">
+                    <div class="response-container mt-3" id="response-body-content">
+                        <p class="text-muted">Send a request to see the response</p>
+                    </div>
+                </div>
+                <div class="tab-pane fade" id="response-headers" role="tabpanel">
+                    <div class="response-container mt-3" id="response-headers-content">
+                        <p class="text-muted">Send a request to see the response headers</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Save Form Section -->
     <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white">
+            <h5 class="mb-0">Save API Request</h5>
+        </div>
         <div class="card-body">
             <form method="post">
                 {% csrf_token %}
                 <div class="row">
                     <div class="col-md-8">
+                        <input type="hidden" name="url" id="saved-url">
+                        <input type="hidden" name="method" id="saved-method">
+                        <input type="hidden" name="headers" id="saved-headers">
+                        <input type="hidden" name="params" id="saved-params">
+                        <input type="hidden" name="body" id="saved-body">
+                        <input type="hidden" name="auth" id="saved-auth">
+                        <input type="hidden" name="timeout" id="saved-timeout">
+                        <input type="hidden" name="follow_redirects" id="saved-follow-redirects">
+                        <input type="hidden" name="verify_ssl" id="saved-verify-ssl">
+                        
                         {{ form|crispy }}
+                        
                         <div class="mt-3">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-save me-1"></i> {% if form.instance.pk %}Update{% else %}Create{% endif %} API Request
+                            <button type="submit" class="btn btn-primary" id="save-btn-submit">
+                                <i class="fas fa-save me-1"></i> {% if form.instance.pk %}Update{% else %}Save{% endif %} API Request
                             </button>
                             <a href="{% url 'collection_detail' collection_id %}" class="btn btn-outline-secondary">
                                 Cancel
@@ -31,17 +268,16 @@
                     <div class="col-md-4">
                         <div class="card bg-light">
                             <div class="card-body">
-                                <h5>About API Requests</h5>
+                                <h5>Testing and Saving</h5>
                                 <p>
-                                    An API request represents a single endpoint that you want to test.
-                                    Complete this form with the basic information, and you'll be able to:
+                                    You can test your API request first, then save it to your collection.
                                 </p>
-                                <ul>
-                                    <li>Add detailed headers, parameters, and body data</li>
-                                    <li>Send the request and view responses</li>
-                                    <li>Save the request for future use</li>
-                                    <li>View request history</li>
-                                </ul>
+                                <ol>
+                                    <li>Configure and send your request</li>
+                                    <li>Review the response</li>
+                                    <li>Provide a name and description</li>
+                                    <li>Click "Save API Request"</li>
+                                </ol>
                                 <p class="mb-0">
                                     <strong>Tip:</strong> Use descriptive names to identify your requests easily.
                                 </p>
@@ -53,4 +289,367 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        
+        // Auth type toggle
+        document.getElementById('auth-type').addEventListener('change', function() {
+            const authType = this.value;
+            document.querySelectorAll('.auth-details').forEach(el => el.style.display = 'none');
+            if (authType !== 'none') {
+                document.getElementById(`${authType}-auth-details`).style.display = 'block';
+            }
+        });
+
+        // Body type toggle
+        document.getElementById('body-type').addEventListener('change', function() {
+            const bodyType = this.value;
+            document.querySelectorAll('.body-inputs').forEach(el => el.style.display = 'none');
+            if (bodyType !== 'none') {
+                document.getElementById(`${bodyType}-body`).style.display = 'block';
+            }
+        });
+        
+        // Add keyboard event handling for URL field - press Enter to send
+        document.getElementById('url-ajax').addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                sendRequest();
+            }
+        });
+
+        // Add param button
+        document.getElementById('add-param').addEventListener('click', function() {
+            const paramRow = document.createElement('div');
+            paramRow.className = 'row mb-2';
+            paramRow.innerHTML = `
+                <div class="col-5">
+                    <input type="text" class="form-control param-key" placeholder="Key">
+                </div>
+                <div class="col-5">
+                    <input type="text" class="form-control param-value" placeholder="Value">
+                </div>
+                <div class="col-2">
+                    <button class="btn btn-sm btn-outline-danger remove-param">Remove</button>
+                </div>
+            `;
+            document.querySelector('.param-rows').appendChild(paramRow);
+            
+            // Add event listener to the newly created remove button
+            paramRow.querySelector('.remove-param').addEventListener('click', function() {
+                paramRow.remove();
+            });
+        });
+
+        // Add header button
+        document.getElementById('add-header').addEventListener('click', function() {
+            const headerRow = document.createElement('div');
+            headerRow.className = 'row mb-2';
+            headerRow.innerHTML = `
+                <div class="col-5">
+                    <input type="text" class="form-control header-key" placeholder="Key">
+                </div>
+                <div class="col-5">
+                    <input type="text" class="form-control header-value" placeholder="Value">
+                </div>
+                <div class="col-2">
+                    <button class="btn btn-sm btn-outline-danger remove-header">Remove</button>
+                </div>
+            `;
+            document.querySelector('.header-rows').appendChild(headerRow);
+            
+            // Add event listener to the newly created remove button
+            headerRow.querySelector('.remove-header').addEventListener('click', function() {
+                headerRow.remove();
+            });
+        });
+
+        // Add form item button
+        document.getElementById('add-form-item').addEventListener('click', function() {
+            const formRow = document.createElement('div');
+            formRow.className = 'row mb-2';
+            formRow.innerHTML = `
+                <div class="col-5">
+                    <input type="text" class="form-control form-key" placeholder="Key">
+                </div>
+                <div class="col-5">
+                    <input type="text" class="form-control form-value" placeholder="Value">
+                </div>
+                <div class="col-2">
+                    <button class="btn btn-sm btn-outline-danger remove-form-item">Remove</button>
+                </div>
+            `;
+            document.querySelector('.form-rows').appendChild(formRow);
+            
+            // Add event listener to the newly created remove button
+            formRow.querySelector('.remove-form-item').addEventListener('click', function() {
+                formRow.remove();
+            });
+        });
+
+        // Add remove button event listeners for initial rows
+        document.querySelectorAll('.remove-param, .remove-header, .remove-form-item').forEach(button => {
+            button.addEventListener('click', function() {
+                this.closest('.row').remove();
+            });
+        });
+
+        // Send button event listener
+        document.getElementById('send-btn-ajax').addEventListener('click', function() {
+            sendRequest();
+        });
+
+        // Submit button - transfer request data to hidden form fields
+        document.getElementById('save-btn-submit').addEventListener('click', function(e) {
+            document.getElementById('saved-url').value = document.getElementById('url-ajax').value;
+            document.getElementById('saved-method').value = document.getElementById('method-ajax').value;
+            document.getElementById('saved-headers').value = JSON.stringify(getHeaders());
+            document.getElementById('saved-params').value = JSON.stringify(getParams());
+            document.getElementById('saved-body').value = JSON.stringify(getBody());
+            document.getElementById('saved-auth').value = JSON.stringify(getAuth());
+            document.getElementById('saved-timeout').value = document.getElementById('timeout').value;
+            document.getElementById('saved-follow-redirects').value = document.getElementById('follow-redirects').checked;
+            document.getElementById('saved-verify-ssl').value = document.getElementById('verify-ssl').checked;
+        });
+
+        function getParams() {
+            const params = {};
+            document.querySelectorAll('.param-rows .row').forEach(row => {
+                const key = row.querySelector('.param-key').value.trim();
+                const value = row.querySelector('.param-value').value.trim();
+                if (key) {
+                    params[key] = value;
+                }
+            });
+            return params;
+        }
+
+        function getHeaders() {
+            const headers = {};
+            document.querySelectorAll('.header-rows .row').forEach(row => {
+                const key = row.querySelector('.header-key').value.trim();
+                const value = row.querySelector('.header-value').value.trim();
+                if (key) {
+                    headers[key] = value;
+                }
+            });
+            
+            // Add auth headers if needed
+            const authType = document.getElementById('auth-type').value;
+            if (authType === 'bearer') {
+                const token = document.getElementById('bearer-token').value;
+                if (token) {
+                    headers['Authorization'] = `Bearer ${token}`;
+                }
+            } else if (authType === 'apikey') {
+                const keyName = document.getElementById('apikey-name').value;
+                const keyValue = document.getElementById('apikey-value').value;
+                const location = document.getElementById('apikey-location').value;
+                
+                if (keyName && keyValue && location === 'header') {
+                    headers[keyName] = keyValue;
+                }
+            }
+            
+            return headers;
+        }
+
+        function getBody() {
+            const bodyType = document.getElementById('body-type').value;
+            
+            if (bodyType === 'json') {
+                const jsonText = document.getElementById('json-editor').value.trim();
+                try {
+                    return jsonText ? JSON.parse(jsonText) : {};
+                } catch (e) {
+                    alert('Invalid JSON: ' + e.message);
+                    return {};
+                }
+            } else if (bodyType === 'form') {
+                const formData = {};
+                document.querySelectorAll('.form-rows .row').forEach(row => {
+                    const key = row.querySelector('.form-key').value.trim();
+                    const value = row.querySelector('.form-value').value.trim();
+                    if (key) {
+                        formData[key] = value;
+                    }
+                });
+                return formData;
+            } else if (bodyType === 'raw') {
+                return document.getElementById('raw-editor').value;
+            }
+            
+            return {};
+        }
+
+        function getAuth() {
+            const authType = document.getElementById('auth-type').value;
+            const auth = { type: authType };
+            
+            if (authType === 'basic') {
+                auth.username = document.getElementById('basic-username').value;
+                auth.password = document.getElementById('basic-password').value;
+            } else if (authType === 'bearer') {
+                auth.token = document.getElementById('bearer-token').value;
+            } else if (authType === 'apikey') {
+                auth.key = document.getElementById('apikey-name').value;
+                auth.value = document.getElementById('apikey-value').value;
+                auth.location = document.getElementById('apikey-location').value;
+            }
+            
+            return auth;
+        }
+
+        function updateQueryParams(url, params) {
+            try {
+                const urlObj = new URL(url);
+                for (const [key, value] of Object.entries(params)) {
+                    urlObj.searchParams.set(key, value);
+                }
+                return urlObj.toString();
+            } catch (e) {
+                console.error("Error updating URL parameters:", e);
+                return url;
+            }
+        }
+
+        function updateResponse(message) {
+            document.getElementById('status-code').textContent = 'Processing...';
+            document.getElementById('status-code').className = 'badge bg-secondary';
+            document.getElementById('response-time').textContent = '0 ms';
+            document.getElementById('response-body-content').innerHTML = `<p class="text-muted">${message}</p>`;
+            document.getElementById('response-headers-content').innerHTML = '<p class="text-muted">Waiting for response...</p>';
+        }
+
+        function displayResponse(data) {
+            // Update status code
+            const statusCode = data.status_code;
+            document.getElementById('status-code').textContent = statusCode;
+            
+            let statusClass = 'bg-secondary';
+            if (statusCode >= 200 && statusCode < 300) {
+                statusClass = 'bg-success';
+            } else if (statusCode >= 300 && statusCode < 400) {
+                statusClass = 'bg-info';
+            } else if (statusCode >= 400 && statusCode < 500) {
+                statusClass = 'bg-warning';
+            } else if (statusCode >= 500) {
+                statusClass = 'bg-danger';
+            }
+            document.getElementById('status-code').className = `badge ${statusClass}`;
+            
+            // Update response time
+            document.getElementById('response-time').textContent = `${Math.round(data.time || 0)} ms`;
+            
+            // Update response body
+            const responseBodyContainer = document.getElementById('response-body-content');
+            responseBodyContainer.innerHTML = '';
+            
+            if (typeof data.body === 'object') {
+                const pre = document.createElement('pre');
+                pre.textContent = JSON.stringify(data.body, null, 2);
+                responseBodyContainer.appendChild(pre);
+            } else {
+                const pre = document.createElement('pre');
+                pre.textContent = data.body;
+                responseBodyContainer.appendChild(pre);
+            }
+            
+            // Update response headers
+            const responseHeadersContainer = document.getElementById('response-headers-content');
+            responseHeadersContainer.innerHTML = '';
+            const headersContent = document.createElement('pre');
+            headersContent.textContent = JSON.stringify(data.headers, null, 2);
+            responseHeadersContainer.appendChild(headersContent);
+        }
+
+        function sendRequest() {
+            const method = document.getElementById('method-ajax').value;
+            let url = document.getElementById('url-ajax').value.trim();
+            
+            if (!url) {
+                alert('Please enter a URL');
+                return;
+            }
+            
+            // Add protocol if missing
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                url = 'https://' + url;
+            }
+            
+            const params = getParams();
+            const headers = getHeaders();
+            const body = getBody();
+            const auth = getAuth();
+            const followRedirects = document.getElementById('follow-redirects').checked;
+            const verifySSL = document.getElementById('verify-ssl').checked;
+            
+            // Update URL with query params for GET, HEAD, DELETE, OPTIONS
+            if (method === 'GET' || method === 'HEAD' || method === 'DELETE' || method === 'OPTIONS') {
+                try {
+                    url = updateQueryParams(url, params);
+                } catch (e) {
+                    alert('Invalid URL: ' + e.message);
+                    return;
+                }
+            }
+            
+            // Update status indicator
+            updateResponse('Sending request...');
+            
+            // Send the request
+            fetch('/api/send/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({
+                    url: url,
+                    method: method,
+                    params: params,
+                    headers: headers,
+                    body: body,
+                    auth: auth,
+                    follow_redirects: followRedirects,
+                    verify_ssl: verifySSL
+                })
+            })
+            .then(response => {
+                console.log('Response received:', response);
+                if (!response.ok) {
+                    throw new Error('Server returned ' + response.status + ' ' + response.statusText);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Data received:', data);
+                displayResponse(data);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('status-code').textContent = 'Error';
+                document.getElementById('status-code').className = 'badge bg-danger';
+                
+                const errorBodyContainer = document.getElementById('response-body-content');
+                errorBodyContainer.innerHTML = '';
+                const errorBodyMessage = document.createElement('div');
+                errorBodyMessage.className = 'alert alert-danger';
+                errorBodyMessage.textContent = 'Error: ' + error.message;
+                errorBodyContainer.appendChild(errorBodyMessage);
+                
+                const errorHeadersContainer = document.getElementById('response-headers-content');
+                errorHeadersContainer.innerHTML = '';
+                const errorHeadersMessage = document.createElement('div');
+                errorHeadersMessage.className = 'alert alert-danger';
+                errorHeadersMessage.textContent = 'Error: ' + error.message;
+                errorHeadersContainer.appendChild(errorHeadersMessage);
+            });
+        }
+    });
+</script>
 {% endblock %} 

@@ -82,10 +82,8 @@ class APIRequestForm(forms.ModelForm):
     """Form for creating and editing API requests"""
     class Meta:
         model = APIRequest
-        fields = ['name', 'description', 'url', 'method']
+        fields = ['name', 'description']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
-            'url': forms.TextInput(attrs={'class': 'form-control'}),
-            'method': forms.Select(attrs={'class': 'form-control'}),
         } 
