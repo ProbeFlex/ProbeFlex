@@ -197,7 +197,8 @@ class ProjectListView(LoginRequiredMixin, ListView):
     
     def get_queryset(self):
         # Show projects owned by the user or accessible via teams
-        return Project.objects.filter(owner=self.request.user) | Project.objects.filter(teams__members=self.request.user).distinct()
+        return (Project.objects.filter(owner=self.request.user) | 
+                Project.objects.filter(teams__members=self.request.user)).distinct()
 
 
 class ProjectDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
