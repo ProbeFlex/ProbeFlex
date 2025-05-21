@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load crispy_forms_tags %}
+{% load static %}
 
 {% block title %}{{ request.name }} - ProbeFlex{% endblock %}
 
@@ -8,6 +9,17 @@
 {% csrf_token %}
 
 <div class="container-fluid px-0">
+    <!-- Hidden JSON data scripts - Fix the potential JSON formatting issues -->
+    <script type="application/json" id="headers-data">{% if request.headers %}{{ request.headers|safe }}{% else %}{}{% endif %}</script>
+    <script type="application/json" id="params-data">{% if request.params %}{{ request.params|safe }}{% else %}{}{% endif %}</script>
+    <script type="application/json" id="body-data">{% if request.body %}{{ request.body|safe }}{% else %}{}{% endif %}</script>
+    <script type="application/json" id="auth-data">{% if request.auth %}{{ request.auth|safe }}{% else %}{}{% endif %}</script>
+    <script id="request-id" type="application/json">{{ request.id }}</script>
+    <script id="request-url" type="application/json">"{{ request.url|safe }}"</script>
+    <script id="request-method" type="application/json">"{{ request.method }}"</script>
+    <script id="follow-redirects" type="application/json">{{ request.follow_redirects|yesno:"true,false" }}</script>
+    <script id="verify-ssl" type="application/json">{{ request.verify_ssl|yesno:"true,false" }}</script>
+    
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h2>{{ request.name }}</h2>
@@ -23,141 +35,253 @@
         </div>
     </div>
 
-    <div class="card border-0 shadow-sm mb-4">
-        <div class="card-header bg-white">
-            <ul class="nav nav-tabs card-header-tabs" id="requestTabs" role="tablist">
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link active" id="details-tab" data-bs-toggle="tab" data-bs-target="#details" type="button" role="tab">Details</button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="headers-tab" data-bs-toggle="tab" data-bs-target="#headers" type="button" role="tab">Headers</button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="params-tab" data-bs-toggle="tab" data-bs-target="#params" type="button" role="tab">Params</button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="body-tab" data-bs-toggle="tab" data-bs-target="#body" type="button" role="tab">Body</button>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <button class="nav-link" id="history-tab" data-bs-toggle="tab" data-bs-target="#history" type="button" role="tab">History</button>
-                </li>
-            </ul>
-        </div>
+    <div class="card border-0 shadow-sm">
         <div class="card-body">
-            <div class="tab-content">
-                <div class="tab-pane fade show active" id="details" role="tabpanel">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <h5>Description</h5>
-                            <p>
-                                {% if request.description %}
-                                {{ request.description }}
-                                {% else %}
-                                <span class="text-muted">No description provided.</span>
-                                {% endif %}
-                            </p>
-                            <div class="d-grid gap-2 d-md-block">
-                                <button class="btn btn-primary" id="send-btn">
-                                    <i class="fas fa-paper-plane me-1"></i> Send Request
-                                </button>
-                                <a href="#" class="btn btn-outline-secondary">
-                                    <i class="fas fa-edit me-1"></i> Edit Request
-                                </a>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="card bg-light">
-                                <div class="card-body">
-                                    <p><strong>Collection:</strong> {{ request.collection.name }}</p>
-                                    <p><strong>Project:</strong> {{ request.collection.project.name }}</p>
-                                    <p><strong>Created:</strong> {{ request.created_at|date:"F j, Y" }}</p>
-                                    <p><strong>Last Updated:</strong> {{ request.updated_at|date:"F j, Y" }}</p>
-                                </div>
-                            </div>
-                        </div>
+            <div class="d-flex align-items-center mb-3">
+                <div class="flex-grow-1">
+                    <div class="input-group">
+                        <select class="form-select flex-grow-0" style="width: 120px;" id="method-ajax" disabled>
+                            <option value="{{ request.method }}" selected>{{ request.method }}</option>
+                        </select>
+                        <input type="text" class="form-control" id="url-ajax" value="{{ request.url }}" readonly>
+                        <button class="btn btn-primary" id="send-btn-ajax">Send</button>
                     </div>
                 </div>
-                <div class="tab-pane fade" id="headers" role="tabpanel">
-                    {% if request.headers %}
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Key</th>
-                                <th>Value</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for key, value in request.headers.items %}
-                            <tr>
-                                <td>{{ key }}</td>
-                                <td>{{ value }}</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                    {% else %}
-                    <p class="text-muted">No headers configured.</p>
-                    {% endif %}
+                <div class="ms-2">
+                    <a href="/requests/{{ request.id }}/edit/" class="btn btn-outline-secondary">
+                        <i class="fas fa-edit me-1"></i> Edit
+                    </a>
                 </div>
-                <div class="tab-pane fade" id="params" role="tabpanel">
+            </div>
+
+            <ul class="nav nav-tabs" id="requestTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="params-tab" data-bs-toggle="tab" data-bs-target="#params" type="button" role="tab" aria-controls="params" aria-selected="true">Params</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="auth-tab" data-bs-toggle="tab" data-bs-target="#auth" type="button" role="tab" aria-controls="auth" aria-selected="false">Auth</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="headers-tab" data-bs-toggle="tab" data-bs-target="#headers" type="button" role="tab" aria-controls="headers" aria-selected="false">Headers</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="body-tab" data-bs-toggle="tab" data-bs-target="#body" type="button" role="tab" aria-controls="body" aria-selected="false">Body</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="settings-tab" data-bs-toggle="tab" data-bs-target="#settings" type="button" role="tab" aria-controls="settings" aria-selected="false">Settings</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="history-tab" data-bs-toggle="tab" data-bs-target="#history" type="button" role="tab" aria-controls="history" aria-selected="false">History</button>
+                </li>
+            </ul>
+
+            <div class="tab-content" id="requestTabsContent">
+                <!-- Params Tab -->
+                <div class="tab-pane fade show active" id="params" role="tabpanel" aria-labelledby="params-tab">
                     {% if request.params %}
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Key</th>
-                                <th>Value</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for key, value in request.params.items %}
-                            <tr>
-                                <td>{{ key }}</td>
-                                <td>{{ value }}</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                    {% else %}
-                    <p class="text-muted">No parameters configured.</p>
-                    {% endif %}
-                </div>
-                <div class="tab-pane fade" id="body" role="tabpanel">
-                    {% if request.body %}
-                    <pre class="bg-light p-3 rounded"><code>{{ request.body|pprint }}</code></pre>
-                    {% else %}
-                    <p class="text-muted">No request body configured.</p>
-                    {% endif %}
-                </div>
-                <div class="tab-pane fade" id="history" role="tabpanel">
-                    {% if history %}
-                    <div class="table-responsive">
+                    <div class="mt-3">
                         <table class="table">
                             <thead>
                                 <tr>
-                                    <th>Date</th>
-                                    <th>Status</th>
-                                    <th>Response Time</th>
-                                    <th>Executed By</th>
+                                    <th>Key</th>
+                                    <th>Value</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for entry in history %}
+                                {% for key, value in request.params.items %}
                                 <tr>
-                                    <td>{{ entry.executed_at|date:"M d, Y H:i:s" }}</td>
-                                    <td>
-                                        <span class="badge {% if entry.response_status < 400 %}bg-success{% elif entry.response_status < 500 %}bg-warning{% else %}bg-danger{% endif %}">
-                                            {{ entry.response_status }}
-                                        </span>
-                                    </td>
-                                    <td>{{ entry.response_time|floatformat:2 }} ms</td>
-                                    <td>{{ entry.executed_by.username }}</td>
+                                    <td>{{ key }}</td>
+                                    <td>{{ value }}</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
                         </table>
                     </div>
                     {% else %}
-                    <p class="text-muted">No execution history yet. Send a request to see results.</p>
+                    <div class="mt-3">
+                        <p class="text-muted">No parameters configured.</p>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Auth Tab -->
+                <div class="tab-pane fade" id="auth" role="tabpanel" aria-labelledby="auth-tab">
+                    <div class="mt-3">
+                        {% if request.auth and request.auth.type %}
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h5>Authentication Type: {{ request.auth.type|default:"None"|title }}</h5>
+                                
+                                {% if request.auth.type == 'basic' %}
+                                <div class="mt-3">
+                                    <p><strong>Username:</strong> {{ request.auth.username }}</p>
+                                    <p><strong>Password:</strong> ••••••••</p>
+                                </div>
+                                {% elif request.auth.type == 'bearer' %}
+                                <div class="mt-3">
+                                    <p><strong>Token:</strong> {{ request.auth.token|truncatechars:20 }}</p>
+                                </div>
+                                {% elif request.auth.type == 'apikey' %}
+                                <div class="mt-3">
+                                    <p><strong>Key Name:</strong> {{ request.auth.key }}</p>
+                                    <p><strong>Key Value:</strong> {{ request.auth.value|truncatechars:20 }}</p>
+                                    <p><strong>Location:</strong> {{ request.auth.location|title }}</p>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% else %}
+                        <p class="text-muted">No authentication configured.</p>
+                        {% endif %}
+                        
+                        <!-- Hidden fields for auth to work with send_request.js -->
+                        <div style="display: none;">
+                            <select id="auth-type">
+                                <option value="{{ request.auth.type|default:'none' }}" selected></option>
+                            </select>
+                            <input type="text" id="basic-username" value="{{ request.auth.username|default:'' }}">
+                            <input type="password" id="basic-password" value="{{ request.auth.password|default:'' }}">
+                            <input type="text" id="bearer-token" value="{{ request.auth.token|default:'' }}">
+                            <input type="text" id="apikey-name" value="{{ request.auth.key|default:'' }}">
+                            <input type="text" id="apikey-value" value="{{ request.auth.value|default:'' }}">
+                            <select id="apikey-location">
+                                <option value="{{ request.auth.location|default:'header' }}" selected></option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Headers Tab -->
+                <div class="tab-pane fade" id="headers" role="tabpanel" aria-labelledby="headers-tab">
+                    {% if request.headers %}
+                    <div class="mt-3">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Key</th>
+                                    <th>Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for key, value in request.headers.items %}
+                                <tr>
+                                    <td>{{ key }}</td>
+                                    <td>{{ value }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="mt-3">
+                        <p class="text-muted">No headers configured.</p>
+                    </div>
+                    {% endif %}
+                    
+                    <!-- Hidden field for headers to work with send_request.js -->
+                    <div style="display: none;" class="header-rows"></div>
+                </div>
+
+                <!-- Body Tab -->
+                <div class="tab-pane fade" id="body" role="tabpanel" aria-labelledby="body-tab">
+                    <div class="mt-3">
+                        {% if request.body %}
+                        <div class="card bg-light">
+                            <div class="card-header">
+                                Body Type: 
+                                {% if request.body.items %}
+                                JSON
+                                {% else %}
+                                Raw
+                                {% endif %}
+                            </div>
+                            <div class="card-body">
+                                <pre class="mb-0"><code>{{ request.body|pprint }}</code></pre>
+                            </div>
+                        </div>
+                        {% else %}
+                        <p class="text-muted">No request body configured.</p>
+                        {% endif %}
+                        
+                        <!-- Hidden fields for body to work with send_request.js -->
+                        <div style="display: none;">
+                            <select id="body-type">
+                                <option value="none">No Body</option>
+                                <option value="json" {% if request.body %}selected{% endif %}>JSON</option>
+                                <option value="form">Form Data</option>
+                                <option value="raw">Raw</option>
+                            </select>
+                            <textarea id="json-editor">{{ request.body|pprint }}</textarea>
+                            <textarea id="raw-editor"></textarea>
+                            <div class="form-rows"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Settings Tab -->
+                <div class="tab-pane fade" id="settings" role="tabpanel" aria-labelledby="settings-tab">
+                    <div class="mt-3">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label class="form-label">Request Timeout</label>
+                                    <p class="mb-0">{{ request.timeout }} ms</p>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Follow Redirects</label>
+                                    <p class="mb-0">{{ request.follow_redirects|yesno:"Yes,No" }}</p>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Verify SSL Certificates</label>
+                                    <p class="mb-0">{{ request.verify_ssl|yesno:"Yes,No" }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Hidden fields for settings to work with send_request.js -->
+                        <div style="display: none;">
+                            <input type="number" id="timeout" value="{{ request.timeout }}">
+                            <input type="checkbox" id="follow-redirects" {% if request.follow_redirects %}checked{% endif %}>
+                            <input type="checkbox" id="verify-ssl" {% if request.verify_ssl %}checked{% endif %}>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- History Tab -->
+                <div class="tab-pane fade" id="history" role="tabpanel" aria-labelledby="history-tab">
+                    {% if history %}
+                    <div class="mt-3">
+                        <div class="table-responsive">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Status</th>
+                                        <th>Response Time</th>
+                                        <th>Executed By</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for entry in history %}
+                                    <tr>
+                                        <td>{{ entry.executed_at|date:"M d, Y H:i:s" }}</td>
+                                        <td>
+                                            <span class="badge {% if entry.response_status < 400 %}bg-success{% elif entry.response_status < 500 %}bg-warning{% else %}bg-danger{% endif %}">
+                                                {{ entry.response_status }}
+                                            </span>
+                                        </td>
+                                        <td>{{ entry.response_time|floatformat:2 }} ms</td>
+                                        <td>{{ entry.executed_by.username }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="mt-3">
+                        <p class="text-muted">No execution history yet. Send a request to see results.</p>
+                    </div>
                     {% endif %}
                 </div>
             </div>
@@ -198,103 +322,234 @@
         </div>
     </div>
 </div>
+
+<!-- Hidden form fields for param-rows to work with send_request.js -->
+<div style="display: none;">
+    <div class="param-rows"></div>
+</div>
+
+<!-- Add a div for headers-rows that was missing -->
+<div style="display: none;">
+    <div class="header-rows"></div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
+<script src="{% static 'js/send_request.js' %}"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-        
-        document.getElementById('send-btn').addEventListener('click', function() {
-            // Update status indicator
-            document.getElementById('status-code').textContent = 'Processing...';
-            document.getElementById('status-code').className = 'badge bg-secondary';
-            document.getElementById('response-time').textContent = '0 ms';
-            document.getElementById('response-body-content').innerHTML = '<p class="text-muted">Sending request...</p>';
-            document.getElementById('response-headers-content').innerHTML = '<p class="text-muted">Waiting for response...</p>';
+        // Sayfa yüklendiğinde JSON verilerini gizli form elemanlarına yükle
+        try {
+            // JSON verilerini al ve konsola yazdır (hata ayıklama için)
+            console.log('Headers raw:', document.getElementById('headers-data').textContent);
+            console.log('Params raw:', document.getElementById('params-data').textContent);
+            console.log('Body raw:', document.getElementById('body-data').textContent);
+            console.log('Auth raw:', document.getElementById('auth-data').textContent);
+            console.log('URL raw:', document.getElementById('request-url').textContent);
+            console.log('Method raw:', document.getElementById('request-method').textContent);
             
-            fetch('/api/send/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': csrfToken
-                },
-                body: JSON.stringify({
-                    url: '{{ request.url }}',
-                    method: '{{ request.method }}',
-                    headers: {{ request.headers|safe }},
-                    params: {{ request.params|safe }},
-                    body: {{ request.body|safe|default:'{}' }},
-                    auth: {{ request.auth|safe|default:'{}' }},
-                    api_request_id: {{ request.id }}
-                })
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Server returned ' + response.status + ' ' + response.statusText);
+            // Her bir JSON verisini ayrı ayrı parse edelim ve hataları yakalayalım
+            let headers = {};
+            try {
+                const headersText = document.getElementById('headers-data').textContent.trim();
+                if (headersText) {
+                    headers = JSON.parse(headersText);
+                    console.log('Parsed headers:', headers);
                 }
-                return response.json();
-            })
-            .then(data => {
-                // Update status code
-                const statusCode = data.status_code;
-                document.getElementById('status-code').textContent = statusCode;
-                
-                let statusClass = 'bg-secondary';
-                if (statusCode >= 200 && statusCode < 300) {
-                    statusClass = 'bg-success';
-                } else if (statusCode >= 300 && statusCode < 400) {
-                    statusClass = 'bg-info';
-                } else if (statusCode >= 400 && statusCode < 500) {
-                    statusClass = 'bg-warning';
-                } else if (statusCode >= 500) {
-                    statusClass = 'bg-danger';
+            } catch (e) {
+                console.error('Headers JSON parse hatası:', e, document.getElementById('headers-data').textContent);
+                headers = {};
+            }
+            
+            let params = {};
+            try {
+                const paramsText = document.getElementById('params-data').textContent.trim();
+                if (paramsText) {
+                    params = JSON.parse(paramsText);
+                    console.log('Parsed params:', params);
                 }
-                document.getElementById('status-code').className = `badge ${statusClass}`;
-                
-                // Update response time
-                document.getElementById('response-time').textContent = `${Math.round(data.time || 0)} ms`;
-                
-                // Update response body
-                const responseBodyContainer = document.getElementById('response-body-content');
-                responseBodyContainer.innerHTML = '';
-                
-                if (typeof data.body === 'object') {
-                    const pre = document.createElement('pre');
-                    pre.textContent = JSON.stringify(data.body, null, 2);
-                    responseBodyContainer.appendChild(pre);
-                } else {
-                    const pre = document.createElement('pre');
-                    pre.textContent = data.body;
-                    responseBodyContainer.appendChild(pre);
+            } catch (e) {
+                console.error('Params JSON parse hatası:', e, document.getElementById('params-data').textContent);
+                params = {};
+            }
+            
+            let body = {};
+            try {
+                const bodyText = document.getElementById('body-data').textContent.trim();
+                if (bodyText) {
+                    body = JSON.parse(bodyText);
+                    console.log('Parsed body:', body);
                 }
+            } catch (e) {
+                console.error('Body JSON parse hatası:', e, document.getElementById('body-data').textContent);
+                body = {};
+            }
+            
+            let auth = {};
+            try {
+                const authText = document.getElementById('auth-data').textContent.trim();
+                if (authText) {
+                    auth = JSON.parse(authText);
+                    console.log('Parsed auth:', auth);
+                }
+            } catch (e) {
+                console.error('Auth JSON parse hatası:', e, document.getElementById('auth-data').textContent);
+                auth = {};
+            }
+            
+            let api_request_id = null;
+            try {
+                const requestIdText = document.getElementById('request-id').textContent.trim();
+                if (requestIdText) {
+                    api_request_id = JSON.parse(requestIdText);
+                    console.log('Parsed request ID:', api_request_id);
+                }
+            } catch (e) {
+                console.error('Request ID JSON parse hatası:', e, document.getElementById('request-id').textContent);
+                api_request_id = null;
+            }
+            
+            // URL ve method bilgilerini form elemanlarına yükle
+            let url = '';
+            try {
+                const urlText = document.getElementById('request-url').textContent.trim();
+                if (urlText) {
+                    url = JSON.parse(urlText);
+                    console.log('Parsed URL:', url);
+                    document.getElementById('url-ajax').value = url;
+                }
+            } catch (e) {
+                console.error('URL parse hatası:', e, document.getElementById('request-url').textContent);
+                // Fallback - try to use the raw text if JSON parsing fails
+                url = document.getElementById('request-url').textContent.trim().replace(/^"|"$/g, '');
+                document.getElementById('url-ajax').value = url;
+            }
+            
+            let method = '';
+            try {
+                const methodText = document.getElementById('request-method').textContent.trim();
+                if (methodText) {
+                    method = JSON.parse(methodText);
+                    console.log('Parsed method:', method);
+                    document.querySelector('#method-ajax option[value="' + method + '"]').selected = true;
+                }
+            } catch (e) {
+                console.error('Method parse hatası:', e, document.getElementById('request-method').textContent);
+                // Fallback - try to use the raw text if JSON parsing fails
+                method = document.getElementById('request-method').textContent.trim().replace(/^"|"$/g, '');
+                try {
+                    document.querySelector('#method-ajax option[value="' + method + '"]').selected = true;
+                } catch (selectError) {
+                    console.error('Method select hatası:', selectError);
+                }
+            }
+            
+            // Auth bilgilerini ilgili form alanlarına yükle
+            if (auth && auth.type) {
+                document.getElementById('auth-type').value = auth.type || 'none';
                 
-                // Update response headers
-                const responseHeadersContainer = document.getElementById('response-headers-content');
-                responseHeadersContainer.innerHTML = '';
-                const headersContent = document.createElement('pre');
-                headersContent.textContent = JSON.stringify(data.headers, null, 2);
-                responseHeadersContainer.appendChild(headersContent);
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                document.getElementById('status-code').textContent = 'Error';
-                document.getElementById('status-code').className = 'badge bg-danger';
-                
-                const errorBodyContainer = document.getElementById('response-body-content');
-                errorBodyContainer.innerHTML = '';
-                const errorBodyMessage = document.createElement('div');
-                errorBodyMessage.className = 'alert alert-danger';
-                errorBodyMessage.textContent = 'Error: ' + error.message;
-                errorBodyContainer.appendChild(errorBodyMessage);
-                
-                const errorHeadersContainer = document.getElementById('response-headers-content');
-                errorHeadersContainer.innerHTML = '';
-                const errorHeadersMessage = document.createElement('div');
-                errorHeadersMessage.className = 'alert alert-danger';
-                errorHeadersMessage.textContent = 'Error: ' + error.message;
-                errorHeadersContainer.appendChild(errorHeadersMessage);
-            });
+                if (auth.type === 'basic') {
+                    document.getElementById('basic-username').value = auth.username || '';
+                    document.getElementById('basic-password').value = auth.password || '';
+                } else if (auth.type === 'bearer') {
+                    document.getElementById('bearer-token').value = auth.token || '';
+                } else if (auth.type === 'apikey') {
+                    document.getElementById('apikey-name').value = auth.key || '';
+                    document.getElementById('apikey-value').value = auth.value || '';
+                    document.getElementById('apikey-location').value = auth.location || 'header';
+                }
+            }
+            
+            // Diğer ayarları form elemanlarına yükle
+            try {
+                const followRedirects = JSON.parse(document.getElementById('follow-redirects').textContent);
+                document.getElementById('follow-redirects').checked = followRedirects;
+            } catch (e) {
+                console.error('Follow redirects parse hatası:', e);
+            }
+            
+            try {
+                const verifySSL = JSON.parse(document.getElementById('verify-ssl').textContent);
+                document.getElementById('verify-ssl').checked = verifySSL;
+            } catch (e) {
+                console.error('Verify SSL parse hatası:', e);
+            }
+            
+            // Headers için gizli alanları ekle
+            const headerRows = document.querySelector('.header-rows');
+            headerRows.innerHTML = ''; // Temizle
+            
+            console.log('Adding headers to hidden fields:', headers);
+            if (headers && typeof headers === 'object') {
+                Object.entries(headers).forEach(([key, value]) => {
+                    const row = document.createElement('div');
+                    row.className = 'row mb-2';
+                    
+                    // Güvenli bir şekilde HTML içeriği oluştur
+                    const safeKey = String(key).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    const safeValue = String(value).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    
+                    row.innerHTML = `
+                        <div class="col-5">
+                            <input type="hidden" class="form-control header-key" value="${safeKey}">
+                        </div>
+                        <div class="col-5">
+                            <input type="hidden" class="form-control header-value" value="${safeValue}">
+                        </div>
+                    `;
+                    headerRows.appendChild(row);
+                });
+            }
+            
+            // Params için gizli alanları ekle
+            const paramRows = document.querySelector('.param-rows');
+            paramRows.innerHTML = ''; // Temizle
+            
+            console.log('Adding params to hidden fields:', params);
+            if (params && typeof params === 'object') {
+                Object.entries(params).forEach(([key, value]) => {
+                    const row = document.createElement('div');
+                    row.className = 'row mb-2';
+                    
+                    // Güvenli bir şekilde HTML içeriği oluştur
+                    const safeKey = String(key).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    const safeValue = String(value).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    
+                    row.innerHTML = `
+                        <div class="col-5">
+                            <input type="hidden" class="form-control param-key" value="${safeKey}">
+                        </div>
+                        <div class="col-5">
+                            <input type="hidden" class="form-control param-value" value="${safeValue}">
+                        </div>
+                    `;
+                    paramRows.appendChild(row);
+                });
+            }
+            
+            // Body verisini ilgili editöre yükle
+            console.log('Setting body value:', body);
+            if (body && typeof body === 'object' && Object.keys(body).length > 0) {
+                document.getElementById('json-editor').value = JSON.stringify(body, null, 2);
+                document.getElementById('body-type').value = 'json';
+            } else if (typeof body === 'string' && body.trim()) {
+                // If body is a string, put it in the raw editor
+                document.getElementById('raw-editor').value = body;
+                document.getElementById('body-type').value = 'raw';
+            }
+
+        } catch (e) {
+            console.error('JSON verilerini işlerken genel hata oluştu:', e);
+        }
+        
+        // Send butonuna tıklayınca direkt standart sendRequest() fonksiyonunu çağır
+        document.getElementById('send-btn-ajax').addEventListener('click', function() {
+            try {
+                sendRequest();
+            } catch (e) {
+                console.error('sendRequest çağrılırken hata:', e);
+                alert('İstek gönderme hatası: ' + e.message);
+            }
         });
     });
 </script>

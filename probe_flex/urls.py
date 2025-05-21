@@ -10,7 +10,7 @@ from probe_app.views import (
     ProjectListView, ProjectDetailView, ProjectCreateView, ProjectUpdateView, ProjectDeleteView,
     CollectionDetailView, CollectionCreateView,
     APIRequestDetailView, APIRequestCreateView,
-    TeamListView, TeamDetailView, TeamCreateView
+    TeamListView, TeamDetailView, TeamCreateView, APIRequestUpdateView
 )
 
 urlpatterns = [
@@ -40,7 +40,8 @@ urlpatterns = [
     # API Request URLs
     path('collections/<int:collection_id>/requests/new/', APIRequestCreateView.as_view(), name='request_create'),
     path('requests/<int:pk>/', APIRequestDetailView.as_view(), name='request_detail'),
-    
+    path('requests/<int:pk>/edit/', APIRequestUpdateView.as_view(), name='request_update'),
+
     # Team URLs
     path('teams/', TeamListView.as_view(), name='team_list'),
     path('teams/new/', TeamCreateView.as_view(), name='team_create'),

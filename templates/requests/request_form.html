@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load crispy_forms_tags %}
+{% load static %}
 
 {% block title %}{% if form.instance.pk %}Edit API Request{% else %}New API Request{% endif %} - ProbeFlex{% endblock %}
 
@@ -292,9 +293,117 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="{% static 'js/send_request.js' %}"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        
+        // Populate form when editing existing request
+        {% if form.instance.pk %}
+        // Set method and URL
+        document.getElementById('method-ajax').value = '{{ form.instance.method }}';
+        document.getElementById('url-ajax').value = '{{ form.instance.url }}';
+        
+        // Set timeout and checkbox settings
+        document.getElementById('timeout').value = {{ form.instance.timeout }};
+        document.getElementById('follow-redirects').checked = {{ form.instance.follow_redirects|yesno:"true,false" }};
+        document.getElementById('verify-ssl').checked = {{ form.instance.verify_ssl|yesno:"true,false" }};
+        
+        // Set auth type
+        const authType = '{{ form.instance.auth.type|default:"none" }}';
+        document.getElementById('auth-type').value = authType;
+        if (authType !== 'none') {
+            document.getElementById(`${authType}-auth-details`).style.display = 'block';
+            
+            if (authType === 'basic') {
+                document.getElementById('basic-username').value = '{{ form.instance.auth.username|default:"" }}';
+                document.getElementById('basic-password').value = '{{ form.instance.auth.password|default:"" }}';
+            } else if (authType === 'bearer') {
+                document.getElementById('bearer-token').value = '{{ form.instance.auth.token|default:"" }}';
+            } else if (authType === 'apikey') {
+                document.getElementById('apikey-name').value = '{{ form.instance.auth.key|default:"" }}';
+                document.getElementById('apikey-value').value = '{{ form.instance.auth.value|default:"" }}';
+                document.getElementById('apikey-location').value = '{{ form.instance.auth.location|default:"header" }}';
+            }
+        }
+        
+        // Set body type and content
+        if (Object.keys({{ form.instance.body|safe|default:'{}' }}).length > 0) {
+            const bodyType = 'json'; // Assuming JSON, could be improved
+            document.getElementById('body-type').value = bodyType;
+            document.getElementById(`${bodyType}-body`).style.display = 'block';
+            
+            if (bodyType === 'json') {
+                document.getElementById('json-editor').value = JSON.stringify({{ form.instance.body|safe|default:'{}' }}, null, 2);
+            }
+        }
+        
+        // Set headers
+        const headers = {{ form.instance.headers|safe|default:'{}' }};
+        let firstHeader = true;
+        for (const [key, value] of Object.entries(headers)) {
+            if (firstHeader) {
+                // Use the first row
+                document.querySelector('.header-rows .row .header-key').value = key;
+                document.querySelector('.header-rows .row .header-value').value = value;
+                firstHeader = false;
+            } else {
+                // Add new rows for additional headers
+                const headerRow = document.createElement('div');
+                headerRow.className = 'row mb-2';
+                headerRow.innerHTML = `
+                    <div class="col-5">
+                        <input type="text" class="form-control header-key" placeholder="Key" value="${key}">
+                    </div>
+                    <div class="col-5">
+                        <input type="text" class="form-control header-value" placeholder="Value" value="${value}">
+                    </div>
+                    <div class="col-2">
+                        <button class="btn btn-sm btn-outline-danger remove-header">Remove</button>
+                    </div>
+                `;
+                document.querySelector('.header-rows').appendChild(headerRow);
+                
+                // Add event listener
+                headerRow.querySelector('.remove-header').addEventListener('click', function() {
+                    headerRow.remove();
+                });
+            }
+        }
+        
+        // Set parameters
+        const params = {{ form.instance.params|safe|default:'{}' }};
+        let firstParam = true;
+        for (const [key, value] of Object.entries(params)) {
+            if (firstParam) {
+                // Use the first row
+                document.querySelector('.param-rows .row .param-key').value = key;
+                document.querySelector('.param-rows .row .param-value').value = value;
+                firstParam = false;
+            } else {
+                // Add new rows for additional params
+                const paramRow = document.createElement('div');
+                paramRow.className = 'row mb-2';
+                paramRow.innerHTML = `
+                    <div class="col-5">
+                        <input type="text" class="form-control param-key" placeholder="Key" value="${key}">
+                    </div>
+                    <div class="col-5">
+                        <input type="text" class="form-control param-value" placeholder="Value" value="${value}">
+                    </div>
+                    <div class="col-2">
+                        <button class="btn btn-sm btn-outline-danger remove-param">Remove</button>
+                    </div>
+                `;
+                document.querySelector('.param-rows').appendChild(paramRow);
+                
+                // Add event listener
+                paramRow.querySelector('.remove-param').addEventListener('click', function() {
+                    paramRow.remove();
+                });
+            }
+        }
+        {% endif %}
         
         // Auth type toggle
         document.getElementById('auth-type').addEventListener('change', function() {

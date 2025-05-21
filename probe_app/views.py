@@ -60,11 +60,12 @@ def send_request(request):
     if request.method == 'POST':
         try:
             # Print debug info to console
-            print(f"Request received: {request.POST or request.body}")
+            print(f"Request received: {request.body[:1000] if hasattr(request, 'body') else 'No body'}")
             
             # Try to handle both form data and JSON
             if request.content_type == 'application/json':
                 data = json.loads(request.body)
+                print(f"Parsed JSON data: {json.dumps(data)[:1000]}")
             else:
                 # Handle form data
                 data = {
@@ -87,24 +88,84 @@ def send_request(request):
             
             print(f"Processing request: {method} {url}")
             print(f"Verify SSL: {verify_ssl}")
+            print(f"Auth data structure: {type(auth_data)}")
+            print(f"Auth data: {json.dumps(auth_data)}")
+            print(f"Headers before auth: {json.dumps(headers)}")
+            
+            # Check if auth is already applied to headers (by client-side JS)
+            auth_already_applied = False
+            if 'Authorization' in headers:
+                print(f"Authorization header already exists: {headers['Authorization'][:15]}...")
+                auth_already_applied = True
             
             auth = None
-            if auth_data.get('type') == 'basic':
-                auth = (auth_data.get('username', ''), auth_data.get('password', ''))
+            # Handle Basic auth
+            if auth_data and auth_data.get('type') == 'basic':
+                username = auth_data.get('username', '')
+                password = auth_data.get('password', '')
+                if username:
+                    auth = (username, password)
+                    print(f"Using Basic Auth: username={username}, password={'*'*len(password) if password else 'None'}")
+            # Handle Bearer token
+            elif auth_data and auth_data.get('type') == 'bearer' and not auth_already_applied:
+                token = auth_data.get('token', '')
+                if token:
+                    headers['Authorization'] = f"Bearer {token}"
+                    print(f"Using Bearer Token Auth: {token[:5]}***")
+            # Handle API Key
+            elif auth_data and auth_data.get('type') == 'apikey' and not auth_already_applied:
+                key_name = auth_data.get('key', '')
+                key_value = auth_data.get('value', '')
+                location = auth_data.get('location', 'header')
+                
+                if key_name and key_value:
+                    if location == 'header':
+                        headers[key_name] = key_value
+                        print(f"Using API Key Auth in header: {key_name}={key_value[:5]}***")
+                    elif location == 'query':
+                        params[key_name] = key_value
+                        print(f"Using API Key Auth in query param: {key_name}={key_value[:5]}***")
+            
+            print(f"Headers after auth: {json.dumps(headers)}")
+            print(f"Auth tuple: {auth}")
             
             start_time = time.time()
             
             request_kwargs = {
                 'headers': headers,
                 'params': params,
-                'auth': auth,
                 'verify': verify_ssl,
-                'allow_redirects': follow_redirects
+                'allow_redirects': follow_redirects,
+                'timeout': 30  # Add a reasonable timeout
             }
+            
+            # Only add auth if it's present (for basic auth)
+            if auth:
+                request_kwargs['auth'] = auth
+                print(f"Added Basic Auth to request_kwargs")
+            
+            # For debugging - show actual request parameters
+            debug_kwargs = request_kwargs.copy()
+            if 'auth' in debug_kwargs:
+                debug_kwargs['auth'] = '(AUTH CREDENTIALS HIDDEN)'
+            if 'headers' in debug_kwargs and 'Authorization' in debug_kwargs['headers']:
+                headers_copy = debug_kwargs['headers'].copy()
+                headers_copy['Authorization'] = headers_copy['Authorization'][:10] + '...'
+                debug_kwargs['headers'] = headers_copy
+            
+            print(f"Final request kwargs: {json.dumps(debug_kwargs)}")
             
             # Add json body for methods that support it
             if method in ['POST', 'PUT', 'PATCH']:
                 request_kwargs['json'] = request_body
+            # For GET requests, we handle the body separately by adding to query params if needed
+            elif method == 'GET' and request_body:
+                # If there's body content in a GET request, log a warning
+                print(f"Warning: Body content sent with GET request: {request_body}")
+                # Use params instead of body for GET requests
+                if isinstance(request_body, dict):
+                    for key, value in request_body.items():
+                        request_kwargs['params'][key] = value
             
             if method == 'GET':
                 response = requests.get(url, **request_kwargs)
@@ -362,6 +423,45 @@ class APIRequestDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
         context = super().get_context_data(**kwargs)
         context['history'] = self.object.history.all()[:10]  # Get the last 10 request executions
         return context
+
+
+class APIRequestUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
+    """View for updating API requests"""
+    model = APIRequest
+    form_class = APIRequestForm
+    template_name = 'requests/request_form.html'
+    
+    def test_func(self):
+        api_request = self.get_object()
+        project = api_request.collection.project
+        return (project.owner == self.request.user or 
+                project.teams.filter(members=self.request.user).exists())
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['collection_id'] = self.object.collection.id
+        return context
+    
+    def form_valid(self, form):
+        # Set additional fields from hidden form inputs
+        form.instance.url = self.request.POST.get('url', '')
+        form.instance.method = self.request.POST.get('method', 'GET')
+        
+        # Handle JSON fields
+        form.instance.headers = json.loads(self.request.POST.get('headers', '{}'))
+        form.instance.params = json.loads(self.request.POST.get('params', '{}'))
+        form.instance.body = json.loads(self.request.POST.get('body', '{}'))
+        form.instance.auth = json.loads(self.request.POST.get('auth', '{}'))
+        
+        # Handle additional request settings
+        form.instance.timeout = int(self.request.POST.get('timeout', 30000))
+        form.instance.follow_redirects = self.request.POST.get('follow_redirects', 'true').lower() == 'true'
+        form.instance.verify_ssl = self.request.POST.get('verify_ssl', 'true').lower() == 'true'
+        
+        return super().form_valid(form)
+    
+    def get_success_url(self):
+        return reverse_lazy('request_detail', kwargs={'pk': self.object.pk})
 
 
 # Team Views
