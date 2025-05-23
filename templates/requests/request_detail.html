@@ -9,16 +9,16 @@
 {% csrf_token %}
 
 <div class="container-fluid px-0">
-    <!-- Hidden JSON data scripts - Fix the potential JSON formatting issues -->
-    <script type="application/json" id="headers-data">{% if request.headers %}{{ request.headers|safe }}{% else %}{}{% endif %}</script>
-    <script type="application/json" id="params-data">{% if request.params %}{{ request.params|safe }}{% else %}{}{% endif %}</script>
-    <script type="application/json" id="body-data">{% if request.body %}{{ request.body|safe }}{% else %}{}{% endif %}</script>
-    <script type="application/json" id="auth-data">{% if request.auth %}{{ request.auth|safe }}{% else %}{}{% endif %}</script>
-    <script id="request-id" type="application/json">{{ request.id }}</script>
-    <script id="request-url" type="application/json">"{{ request.url|safe }}"</script>
-    <script id="request-method" type="application/json">"{{ request.method }}"</script>
-    <script id="follow-redirects" type="application/json">{{ request.follow_redirects|yesno:"true,false" }}</script>
-    <script id="verify-ssl" type="application/json">{{ request.verify_ssl|yesno:"true,false" }}</script>
+    <!-- Hidden JSON data scripts - Use json_script for safer JSON rendering -->
+    {{ request.headers|json_script:"headers-data" }}
+    {{ request.params|json_script:"params-data" }}
+    {{ request.body|json_script:"body-data" }}
+    {{ request.auth|json_script:"auth-data" }}
+    {{ request.id|json_script:"request-id" }}
+    {{ request.url|json_script:"request-url" }}
+    {{ request.method|json_script:"request-method" }}
+    {{ request.follow_redirects|json_script:"follow-redirects" }}
+    {{ request.verify_ssl|json_script:"verify-ssl" }}
     
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
@@ -340,7 +340,7 @@
     document.addEventListener('DOMContentLoaded', function() {
         // Sayfa yüklendiğinde JSON verilerini gizli form elemanlarına yükle
         try {
-            // Güvenli JSON parse fonksiyonu
+            // Güvenli JSON parse fonksiyonu - Django'nun json_script filter'ı ile çalışır
             function safeJsonParse(elementId, defaultValue = {}) {
                 try {
                     const element = document.getElementById(elementId);
@@ -349,19 +349,12 @@
                         return defaultValue;
                     }
                     
-                    const text = element.textContent.trim();
-                    if (!text) {
-                        return defaultValue;
-                    }
-                    
-                    // Eğer text sadece boşluklar veya geçersiz karakterler içeriyorsa
-                    if (text === '{}' || text === '""' || text === 'null' || text === 'undefined') {
-                        return defaultValue;
-                    }
-                    
-                    return JSON.parse(text);
+                    // Django json_script filter uses textContent directly
+                    const data = JSON.parse(element.textContent);
+                    return data;
                 } catch (e) {
-                    console.error(`JSON parse error for ${elementId}:`, e, 'Text:', element ? element.textContent : 'Element not found');
+                    console.error(`JSON parse error for ${elementId}:`, e);
+                    console.error('Raw text:', element ? element.textContent : 'Element not found');
                     return defaultValue;
                 }
             }
@@ -560,18 +553,41 @@
             
             if (body && typeof body === 'object' && Object.keys(body).length > 0) {
                 if (jsonEditorElement) {
-                    jsonEditorElement.value = JSON.stringify(body, null, 2);
+                    // Only stringify if it's already a parsed object
+                    if (typeof body === 'object') {
+                        jsonEditorElement.value = JSON.stringify(body, null, 2);
+                    } else {
+                        // If it's already a string, use it as is
+                        jsonEditorElement.value = body;
+                    }
                 }
                 if (bodyTypeElement) {
                     bodyTypeElement.value = 'json';
                 }
             } else if (typeof body === 'string' && body.trim()) {
-                // If body is a string, put it in the raw editor
-                if (rawEditorElement) {
-                    rawEditorElement.value = body;
+                // Check if the string is actually JSON
+                try {
+                    const parsedBody = JSON.parse(body);
+                    // If it parses successfully, it's JSON - put it in JSON editor
+                    if (jsonEditorElement) {
+                        jsonEditorElement.value = JSON.stringify(parsedBody, null, 2);
+                    }
+                    if (bodyTypeElement) {
+                        bodyTypeElement.value = 'json';
+                    }
+                } catch (e) {
+                    // If it doesn't parse, it's raw text
+                    if (rawEditorElement) {
+                        rawEditorElement.value = body;
+                    }
+                    if (bodyTypeElement) {
+                        bodyTypeElement.value = 'raw';
+                    }
                 }
+            } else {
+                // Empty body - set to none
                 if (bodyTypeElement) {
-                    bodyTypeElement.value = 'raw';
+                    bodyTypeElement.value = 'none';
                 }
             }
 
