@@ -8,11 +8,22 @@
  */
 function getParams() {
     const params = {};
-    document.querySelectorAll('.param-rows .row').forEach(row => {
-        const key = row.querySelector('.param-key').value.trim();
-        const value = row.querySelector('.param-value').value.trim();
-        if (key) {
-            params[key] = value;
+    const paramRows = document.querySelectorAll('.param-rows .row');
+    if (paramRows.length === 0) {
+        console.warn('No param rows found');
+        return {};
+    }
+    
+    paramRows.forEach(row => {
+        const keyElement = row.querySelector('.param-key');
+        const valueElement = row.querySelector('.param-value');
+        
+        if (keyElement && valueElement) {
+            const key = keyElement.value.trim();
+            const value = valueElement.value.trim();
+            if (key) {
+                params[key] = value;
+            }
         }
     });
     return params;
@@ -24,28 +35,53 @@ function getParams() {
  */
 function getHeaders() {
     const headers = {};
-    document.querySelectorAll('.header-rows .row').forEach(row => {
-        const key = row.querySelector('.header-key').value.trim();
-        const value = row.querySelector('.header-value').value.trim();
-        if (key) {
-            headers[key] = value;
-        }
-    });
+    const headerRows = document.querySelectorAll('.header-rows .row');
+    if (headerRows.length === 0) {
+        console.warn('No header rows found');
+    } else {
+        headerRows.forEach(row => {
+            const keyElement = row.querySelector('.header-key');
+            const valueElement = row.querySelector('.header-value');
+            
+            if (keyElement && valueElement) {
+                const key = keyElement.value.trim();
+                const value = valueElement.value.trim();
+                if (key) {
+                    headers[key] = value;
+                }
+            }
+        });
+    }
     
     // Add auth headers if needed
-    const authType = document.getElementById('auth-type').value;
+    const authTypeElement = document.getElementById('auth-type');
+    if (!authTypeElement) {
+        console.warn('auth-type element not found');
+        return headers;
+    }
+    
+    const authType = authTypeElement.value;
     if (authType === 'bearer') {
-        const token = document.getElementById('bearer-token').value;
-        if (token) {
-            headers['Authorization'] = `Bearer ${token}`;
+        const tokenElement = document.getElementById('bearer-token');
+        if (tokenElement) {
+            const token = tokenElement.value;
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
         }
     } else if (authType === 'apikey') {
-        const keyName = document.getElementById('apikey-name').value;
-        const keyValue = document.getElementById('apikey-value').value;
-        const location = document.getElementById('apikey-location').value;
+        const keyNameElement = document.getElementById('apikey-name');
+        const keyValueElement = document.getElementById('apikey-value');
+        const locationElement = document.getElementById('apikey-location');
         
-        if (keyName && keyValue && location === 'header') {
-            headers[keyName] = keyValue;
+        if (keyNameElement && keyValueElement && locationElement) {
+            const keyName = keyNameElement.value;
+            const keyValue = keyValueElement.value;
+            const location = locationElement.value;
+            
+            if (keyName && keyValue && location === 'header') {
+                headers[keyName] = keyValue;
+            }
         }
     }
     
@@ -57,28 +93,60 @@ function getHeaders() {
  * @returns {Object|string} Body data as object or string depending on type
  */
 function getBody() {
-    const bodyType = document.getElementById('body-type').value;
+    const bodyTypeElement = document.getElementById('body-type');
+    if (!bodyTypeElement) {
+        console.warn('body-type element not found, returning empty object');
+        return {};
+    }
+    
+    const bodyType = bodyTypeElement.value;
     
     if (bodyType === 'json') {
-        const jsonText = document.getElementById('json-editor').value.trim();
+        const jsonEditorElement = document.getElementById('json-editor');
+        if (!jsonEditorElement) {
+            console.warn('json-editor element not found, returning empty object');
+            return {};
+        }
+        
+        const jsonText = jsonEditorElement.value.trim();
+        if (!jsonText) {
+            return {};
+        }
+        
         try {
-            return jsonText ? JSON.parse(jsonText) : {};
+            return JSON.parse(jsonText);
         } catch (e) {
             alert('Invalid JSON: ' + e.message);
             return {};
         }
     } else if (bodyType === 'form') {
         const formData = {};
-        document.querySelectorAll('.form-rows .row').forEach(row => {
-            const key = row.querySelector('.form-key').value.trim();
-            const value = row.querySelector('.form-value').value.trim();
-            if (key) {
-                formData[key] = value;
+        const formRows = document.querySelectorAll('.form-rows .row');
+        if (formRows.length === 0) {
+            console.warn('No form rows found');
+            return {};
+        }
+        
+        formRows.forEach(row => {
+            const keyElement = row.querySelector('.form-key');
+            const valueElement = row.querySelector('.form-value');
+            
+            if (keyElement && valueElement) {
+                const key = keyElement.value.trim();
+                const value = valueElement.value.trim();
+                if (key) {
+                    formData[key] = value;
+                }
             }
         });
         return formData;
     } else if (bodyType === 'raw') {
-        return document.getElementById('raw-editor').value;
+        const rawEditorElement = document.getElementById('raw-editor');
+        if (!rawEditorElement) {
+            console.warn('raw-editor element not found, returning empty string');
+            return '';
+        }
+        return rawEditorElement.value;
     }
     
     return {};
@@ -89,18 +157,44 @@ function getBody() {
  * @returns {Object} Authentication configuration
  */
 function getAuth() {
-    const authType = document.getElementById('auth-type').value;
+    const authTypeElement = document.getElementById('auth-type');
+    if (!authTypeElement) {
+        console.warn('auth-type element not found');
+        return { type: 'none' };
+    }
+    
+    const authType = authTypeElement.value;
     const auth = { type: authType };
     
     if (authType === 'basic') {
-        auth.username = document.getElementById('basic-username').value;
-        auth.password = document.getElementById('basic-password').value;
+        const usernameElement = document.getElementById('basic-username');
+        const passwordElement = document.getElementById('basic-password');
+        
+        if (usernameElement && passwordElement) {
+            auth.username = usernameElement.value;
+            auth.password = passwordElement.value;
+        } else {
+            console.warn('Basic auth elements not found');
+        }
     } else if (authType === 'bearer') {
-        auth.token = document.getElementById('bearer-token').value;
+        const tokenElement = document.getElementById('bearer-token');
+        if (tokenElement) {
+            auth.token = tokenElement.value;
+        } else {
+            console.warn('Bearer token element not found');
+        }
     } else if (authType === 'apikey') {
-        auth.key = document.getElementById('apikey-name').value;
-        auth.value = document.getElementById('apikey-value').value;
-        auth.location = document.getElementById('apikey-location').value;
+        const keyElement = document.getElementById('apikey-name');
+        const valueElement = document.getElementById('apikey-value');
+        const locationElement = document.getElementById('apikey-location');
+        
+        if (keyElement && valueElement && locationElement) {
+            auth.key = keyElement.value;
+            auth.value = valueElement.value;
+            auth.location = locationElement.value;
+        } else {
+            console.warn('API key auth elements not found');
+        }
     }
     
     return auth;
@@ -219,8 +313,21 @@ function displayResponse(data) {
  * Send the API request with data from the UI
  */
 function sendRequest() {
-    const method = document.getElementById('method-ajax').value;
-    let url = document.getElementById('url-ajax').value.trim();
+    const methodElement = document.getElementById('method-ajax');
+    const urlElement = document.getElementById('url-ajax');
+    
+    if (!methodElement) {
+        alert('Method selector not found');
+        return;
+    }
+    
+    if (!urlElement) {
+        alert('URL input not found');
+        return;
+    }
+    
+    const method = methodElement.value;
+    let url = urlElement.value.trim();
     
     if (!url) {
         alert('Please enter a URL');
@@ -236,8 +343,13 @@ function sendRequest() {
     const headers = getHeaders();
     const body = getBody();
     const auth = getAuth();
-    const followRedirects = document.getElementById('follow-redirects').checked;
-    const verifySSL = document.getElementById('verify-ssl').checked;
+    
+    // Get follow redirects and verify SSL options with fallbacks
+    const followRedirectsElement = document.getElementById('follow-redirects');
+    const verifySSLElement = document.getElementById('verify-ssl');
+    
+    const followRedirects = followRedirectsElement ? followRedirectsElement.checked : true;
+    const verifySSL = verifySSLElement ? verifySSLElement.checked : true;
     
     // Update URL with query params for GET, HEAD, DELETE, OPTIONS
     if (method === 'GET' || method === 'HEAD' || method === 'DELETE' || method === 'OPTIONS') {
@@ -260,7 +372,12 @@ function sendRequest() {
     console.log('Verify SSL:', verifySSL);
     
     // Get CSRF token
-    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    const csrfTokenElement = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (!csrfTokenElement) {
+        alert('CSRF token not found. Please refresh the page.');
+        return;
+    }
+    const csrfToken = csrfTokenElement.value;
     
     // Send the request
     fetch('/api/send/', {
@@ -293,22 +410,30 @@ function sendRequest() {
     })
     .catch(error => {
         console.error('Error:', error);
-        document.getElementById('status-code').textContent = 'Error';
-        document.getElementById('status-code').className = 'badge bg-danger';
+        
+        const statusCodeElement = document.getElementById('status-code');
+        if (statusCodeElement) {
+            statusCodeElement.textContent = 'Error';
+            statusCodeElement.className = 'badge bg-danger';
+        }
         
         // Create proper error displays
         const errorBodyContainer = document.getElementById('response-body-content');
-        errorBodyContainer.innerHTML = '';
-        const errorBodyMessage = document.createElement('div');
-        errorBodyMessage.className = 'alert alert-danger';
-        errorBodyMessage.textContent = 'Error: ' + error.message;
-        errorBodyContainer.appendChild(errorBodyMessage);
+        if (errorBodyContainer) {
+            errorBodyContainer.innerHTML = '';
+            const errorBodyMessage = document.createElement('div');
+            errorBodyMessage.className = 'alert alert-danger';
+            errorBodyMessage.textContent = 'Error: ' + error.message;
+            errorBodyContainer.appendChild(errorBodyMessage);
+        }
         
         const errorHeadersContainer = document.getElementById('response-headers-content');
-        errorHeadersContainer.innerHTML = '';
-        const errorHeadersMessage = document.createElement('div');
-        errorHeadersMessage.className = 'alert alert-danger';
-        errorHeadersMessage.textContent = 'Error: ' + error.message;
-        errorHeadersContainer.appendChild(errorHeadersMessage);
+        if (errorHeadersContainer) {
+            errorHeadersContainer.innerHTML = '';
+            const errorHeadersMessage = document.createElement('div');
+            errorHeadersMessage.className = 'alert alert-danger';
+            errorHeadersMessage.textContent = 'Error: ' + error.message;
+            errorHeadersContainer.appendChild(errorHeadersMessage);
+        }
     });
 } 

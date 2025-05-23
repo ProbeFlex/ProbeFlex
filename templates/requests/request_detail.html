@@ -340,202 +340,239 @@
     document.addEventListener('DOMContentLoaded', function() {
         // Sayfa yüklendiğinde JSON verilerini gizli form elemanlarına yükle
         try {
+            // Güvenli JSON parse fonksiyonu
+            function safeJsonParse(elementId, defaultValue = {}) {
+                try {
+                    const element = document.getElementById(elementId);
+                    if (!element) {
+                        console.warn(`Element ${elementId} not found`);
+                        return defaultValue;
+                    }
+                    
+                    const text = element.textContent.trim();
+                    if (!text) {
+                        return defaultValue;
+                    }
+                    
+                    // Eğer text sadece boşluklar veya geçersiz karakterler içeriyorsa
+                    if (text === '{}' || text === '""' || text === 'null' || text === 'undefined') {
+                        return defaultValue;
+                    }
+                    
+                    return JSON.parse(text);
+                } catch (e) {
+                    console.error(`JSON parse error for ${elementId}:`, e, 'Text:', element ? element.textContent : 'Element not found');
+                    return defaultValue;
+                }
+            }
+            
+            // Güvenli element alma fonksiyonu
+            function safeGetElement(id) {
+                const element = document.getElementById(id);
+                if (!element) {
+                    console.warn(`Element ${id} not found`);
+                }
+                return element;
+            }
+            
             // JSON verilerini al ve konsola yazdır (hata ayıklama için)
-            console.log('Headers raw:', document.getElementById('headers-data').textContent);
-            console.log('Params raw:', document.getElementById('params-data').textContent);
-            console.log('Body raw:', document.getElementById('body-data').textContent);
-            console.log('Auth raw:', document.getElementById('auth-data').textContent);
-            console.log('URL raw:', document.getElementById('request-url').textContent);
-            console.log('Method raw:', document.getElementById('request-method').textContent);
+            const headersElement = safeGetElement('headers-data');
+            const paramsElement = safeGetElement('params-data');
+            const bodyElement = safeGetElement('body-data');
+            const authElement = safeGetElement('auth-data');
+            const urlElement = safeGetElement('request-url');
+            const methodElement = safeGetElement('request-method');
             
-            // Her bir JSON verisini ayrı ayrı parse edelim ve hataları yakalayalım
-            let headers = {};
-            try {
-                const headersText = document.getElementById('headers-data').textContent.trim();
-                if (headersText) {
-                    headers = JSON.parse(headersText);
-                    console.log('Parsed headers:', headers);
-                }
-            } catch (e) {
-                console.error('Headers JSON parse hatası:', e, document.getElementById('headers-data').textContent);
-                headers = {};
-            }
+            console.log('Headers raw:', headersElement ? headersElement.textContent : 'Element not found');
+            console.log('Params raw:', paramsElement ? paramsElement.textContent : 'Element not found');
+            console.log('Body raw:', bodyElement ? bodyElement.textContent : 'Element not found');
+            console.log('Auth raw:', authElement ? authElement.textContent : 'Element not found');
+            console.log('URL raw:', urlElement ? urlElement.textContent : 'Element not found');
+            console.log('Method raw:', methodElement ? methodElement.textContent : 'Element not found');
             
-            let params = {};
-            try {
-                const paramsText = document.getElementById('params-data').textContent.trim();
-                if (paramsText) {
-                    params = JSON.parse(paramsText);
-                    console.log('Parsed params:', params);
-                }
-            } catch (e) {
-                console.error('Params JSON parse hatası:', e, document.getElementById('params-data').textContent);
-                params = {};
-            }
+            // Her bir JSON verisini güvenli şekilde parse edelim
+            const headers = safeJsonParse('headers-data', {});
+            const params = safeJsonParse('params-data', {});
+            const body = safeJsonParse('body-data', {});
+            const auth = safeJsonParse('auth-data', {});
+            const api_request_id = safeJsonParse('request-id', null);
             
-            let body = {};
-            try {
-                const bodyText = document.getElementById('body-data').textContent.trim();
-                if (bodyText) {
-                    body = JSON.parse(bodyText);
-                    console.log('Parsed body:', body);
-                }
-            } catch (e) {
-                console.error('Body JSON parse hatası:', e, document.getElementById('body-data').textContent);
-                body = {};
-            }
-            
-            let auth = {};
-            try {
-                const authText = document.getElementById('auth-data').textContent.trim();
-                if (authText) {
-                    auth = JSON.parse(authText);
-                    console.log('Parsed auth:', auth);
-                }
-            } catch (e) {
-                console.error('Auth JSON parse hatası:', e, document.getElementById('auth-data').textContent);
-                auth = {};
-            }
-            
-            let api_request_id = null;
-            try {
-                const requestIdText = document.getElementById('request-id').textContent.trim();
-                if (requestIdText) {
-                    api_request_id = JSON.parse(requestIdText);
-                    console.log('Parsed request ID:', api_request_id);
-                }
-            } catch (e) {
-                console.error('Request ID JSON parse hatası:', e, document.getElementById('request-id').textContent);
-                api_request_id = null;
-            }
+            console.log('Parsed headers:', headers);
+            console.log('Parsed params:', params);
+            console.log('Parsed body:', body);
+            console.log('Parsed auth:', auth);
+            console.log('Parsed request ID:', api_request_id);
             
             // URL ve method bilgilerini form elemanlarına yükle
             let url = '';
-            try {
-                const urlText = document.getElementById('request-url').textContent.trim();
-                if (urlText) {
-                    url = JSON.parse(urlText);
-                    console.log('Parsed URL:', url);
-                    document.getElementById('url-ajax').value = url;
+            let method = '';
+            
+            if (urlElement) {
+                try {
+                    const urlText = urlElement.textContent.trim();
+                    if (urlText && urlText !== '""' && urlText !== 'null') {
+                        // Eğer text zaten quotes içindeyse JSON parse et, değilse direkt kullan
+                        if (urlText.startsWith('"') && urlText.endsWith('"')) {
+                            url = JSON.parse(urlText);
+                        } else {
+                            url = urlText;
+                        }
+                    }
+                } catch (e) {
+                    console.error('URL parse hatası:', e);
+                    // Fallback - quotes'ları temizle
+                    url = urlElement.textContent.trim().replace(/^"|"$/g, '');
                 }
-            } catch (e) {
-                console.error('URL parse hatası:', e, document.getElementById('request-url').textContent);
-                // Fallback - try to use the raw text if JSON parsing fails
-                url = document.getElementById('request-url').textContent.trim().replace(/^"|"$/g, '');
-                document.getElementById('url-ajax').value = url;
+                
+                const urlAjaxElement = safeGetElement('url-ajax');
+                if (urlAjaxElement && url) {
+                    urlAjaxElement.value = url;
+                }
             }
             
-            let method = '';
-            try {
-                const methodText = document.getElementById('request-method').textContent.trim();
-                if (methodText) {
-                    method = JSON.parse(methodText);
-                    console.log('Parsed method:', method);
-                    document.querySelector('#method-ajax option[value="' + method + '"]').selected = true;
-                }
-            } catch (e) {
-                console.error('Method parse hatası:', e, document.getElementById('request-method').textContent);
-                // Fallback - try to use the raw text if JSON parsing fails
-                method = document.getElementById('request-method').textContent.trim().replace(/^"|"$/g, '');
+            if (methodElement) {
                 try {
-                    document.querySelector('#method-ajax option[value="' + method + '"]').selected = true;
-                } catch (selectError) {
-                    console.error('Method select hatası:', selectError);
+                    const methodText = methodElement.textContent.trim();
+                    if (methodText && methodText !== '""' && methodText !== 'null') {
+                        // Eğer text zaten quotes içindeyse JSON parse et, değilse direkt kullan
+                        if (methodText.startsWith('"') && methodText.endsWith('"')) {
+                            method = JSON.parse(methodText);
+                        } else {
+                            method = methodText;
+                        }
+                    }
+                } catch (e) {
+                    console.error('Method parse hatası:', e);
+                    // Fallback - quotes'ları temizle
+                    method = methodElement.textContent.trim().replace(/^"|"$/g, '');
+                }
+                
+                if (method) {
+                    try {
+                        const methodSelectElement = document.querySelector('#method-ajax option[value="' + method + '"]');
+                        if (methodSelectElement) {
+                            methodSelectElement.selected = true;
+                        }
+                    } catch (selectError) {
+                        console.error('Method select hatası:', selectError);
+                    }
                 }
             }
             
             // Auth bilgilerini ilgili form alanlarına yükle
-            if (auth && auth.type) {
-                document.getElementById('auth-type').value = auth.type || 'none';
+            const authTypeElement = safeGetElement('auth-type');
+            if (auth && auth.type && authTypeElement) {
+                authTypeElement.value = auth.type || 'none';
                 
                 if (auth.type === 'basic') {
-                    document.getElementById('basic-username').value = auth.username || '';
-                    document.getElementById('basic-password').value = auth.password || '';
+                    const usernameElement = safeGetElement('basic-username');
+                    const passwordElement = safeGetElement('basic-password');
+                    if (usernameElement) usernameElement.value = auth.username || '';
+                    if (passwordElement) passwordElement.value = auth.password || '';
                 } else if (auth.type === 'bearer') {
-                    document.getElementById('bearer-token').value = auth.token || '';
+                    const tokenElement = safeGetElement('bearer-token');
+                    if (tokenElement) tokenElement.value = auth.token || '';
                 } else if (auth.type === 'apikey') {
-                    document.getElementById('apikey-name').value = auth.key || '';
-                    document.getElementById('apikey-value').value = auth.value || '';
-                    document.getElementById('apikey-location').value = auth.location || 'header';
+                    const keyNameElement = safeGetElement('apikey-name');
+                    const keyValueElement = safeGetElement('apikey-value');
+                    const keyLocationElement = safeGetElement('apikey-location');
+                    if (keyNameElement) keyNameElement.value = auth.key || '';
+                    if (keyValueElement) keyValueElement.value = auth.value || '';
+                    if (keyLocationElement) keyLocationElement.value = auth.location || 'header';
                 }
             }
             
             // Diğer ayarları form elemanlarına yükle
-            try {
-                const followRedirects = JSON.parse(document.getElementById('follow-redirects').textContent);
-                document.getElementById('follow-redirects').checked = followRedirects;
-            } catch (e) {
-                console.error('Follow redirects parse hatası:', e);
-            }
+            const followRedirectsData = safeJsonParse('follow-redirects', true);
+            const verifySSLData = safeJsonParse('verify-ssl', true);
             
-            try {
-                const verifySSL = JSON.parse(document.getElementById('verify-ssl').textContent);
-                document.getElementById('verify-ssl').checked = verifySSL;
-            } catch (e) {
-                console.error('Verify SSL parse hatası:', e);
+            const followRedirectsElement = safeGetElement('follow-redirects');
+            const verifySSLElement = safeGetElement('verify-ssl');
+            
+            if (followRedirectsElement) {
+                followRedirectsElement.checked = followRedirectsData;
+            }
+            if (verifySSLElement) {
+                verifySSLElement.checked = verifySSLData;
             }
             
             // Headers için gizli alanları ekle
             const headerRows = document.querySelector('.header-rows');
-            headerRows.innerHTML = ''; // Temizle
-            
-            console.log('Adding headers to hidden fields:', headers);
-            if (headers && typeof headers === 'object') {
-                Object.entries(headers).forEach(([key, value]) => {
-                    const row = document.createElement('div');
-                    row.className = 'row mb-2';
-                    
-                    // Güvenli bir şekilde HTML içeriği oluştur
-                    const safeKey = String(key).replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                    const safeValue = String(value).replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                    
-                    row.innerHTML = `
-                        <div class="col-5">
-                            <input type="hidden" class="form-control header-key" value="${safeKey}">
-                        </div>
-                        <div class="col-5">
-                            <input type="hidden" class="form-control header-value" value="${safeValue}">
-                        </div>
-                    `;
-                    headerRows.appendChild(row);
-                });
+            if (headerRows) {
+                headerRows.innerHTML = ''; // Temizle
+                
+                console.log('Adding headers to hidden fields:', headers);
+                if (headers && typeof headers === 'object') {
+                    Object.entries(headers).forEach(([key, value]) => {
+                        const row = document.createElement('div');
+                        row.className = 'row mb-2';
+                        
+                        // Güvenli bir şekilde HTML içeriği oluştur
+                        const safeKey = String(key).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                        const safeValue = String(value).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                        
+                        row.innerHTML = `
+                            <div class="col-5">
+                                <input type="hidden" class="form-control header-key" value="${safeKey}">
+                            </div>
+                            <div class="col-5">
+                                <input type="hidden" class="form-control header-value" value="${safeValue}">
+                            </div>
+                        `;
+                        headerRows.appendChild(row);
+                    });
+                }
             }
             
             // Params için gizli alanları ekle
             const paramRows = document.querySelector('.param-rows');
-            paramRows.innerHTML = ''; // Temizle
-            
-            console.log('Adding params to hidden fields:', params);
-            if (params && typeof params === 'object') {
-                Object.entries(params).forEach(([key, value]) => {
-                    const row = document.createElement('div');
-                    row.className = 'row mb-2';
-                    
-                    // Güvenli bir şekilde HTML içeriği oluştur
-                    const safeKey = String(key).replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                    const safeValue = String(value).replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                    
-                    row.innerHTML = `
-                        <div class="col-5">
-                            <input type="hidden" class="form-control param-key" value="${safeKey}">
-                        </div>
-                        <div class="col-5">
-                            <input type="hidden" class="form-control param-value" value="${safeValue}">
-                        </div>
-                    `;
-                    paramRows.appendChild(row);
-                });
+            if (paramRows) {
+                paramRows.innerHTML = ''; // Temizle
+                
+                console.log('Adding params to hidden fields:', params);
+                if (params && typeof params === 'object') {
+                    Object.entries(params).forEach(([key, value]) => {
+                        const row = document.createElement('div');
+                        row.className = 'row mb-2';
+                        
+                        // Güvenli bir şekilde HTML içeriği oluştur
+                        const safeKey = String(key).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                        const safeValue = String(value).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                        
+                        row.innerHTML = `
+                            <div class="col-5">
+                                <input type="hidden" class="form-control param-key" value="${safeKey}">
+                            </div>
+                            <div class="col-5">
+                                <input type="hidden" class="form-control param-value" value="${safeValue}">
+                            </div>
+                        `;
+                        paramRows.appendChild(row);
+                    });
+                }
             }
             
             // Body verisini ilgili editöre yükle
             console.log('Setting body value:', body);
+            const jsonEditorElement = safeGetElement('json-editor');
+            const rawEditorElement = safeGetElement('raw-editor');
+            const bodyTypeElement = safeGetElement('body-type');
+            
             if (body && typeof body === 'object' && Object.keys(body).length > 0) {
-                document.getElementById('json-editor').value = JSON.stringify(body, null, 2);
-                document.getElementById('body-type').value = 'json';
+                if (jsonEditorElement) {
+                    jsonEditorElement.value = JSON.stringify(body, null, 2);
+                }
+                if (bodyTypeElement) {
+                    bodyTypeElement.value = 'json';
+                }
             } else if (typeof body === 'string' && body.trim()) {
                 // If body is a string, put it in the raw editor
-                document.getElementById('raw-editor').value = body;
-                document.getElementById('body-type').value = 'raw';
+                if (rawEditorElement) {
+                    rawEditorElement.value = body;
+                }
+                if (bodyTypeElement) {
+                    bodyTypeElement.value = 'raw';
+                }
             }
 
         } catch (e) {
@@ -543,14 +580,22 @@
         }
         
         // Send butonuna tıklayınca direkt standart sendRequest() fonksiyonunu çağır
-        document.getElementById('send-btn-ajax').addEventListener('click', function() {
-            try {
-                sendRequest();
-            } catch (e) {
-                console.error('sendRequest çağrılırken hata:', e);
-                alert('İstek gönderme hatası: ' + e.message);
-            }
-        });
+        const sendBtnElement = safeGetElement('send-btn-ajax');
+        if (sendBtnElement) {
+            sendBtnElement.addEventListener('click', function() {
+                try {
+                    if (typeof sendRequest === 'function') {
+                        sendRequest();
+                    } else {
+                        console.error('sendRequest function not found');
+                        alert('Send request function not available');
+                    }
+                } catch (e) {
+                    console.error('sendRequest çağrılırken hata:', e);
+                    alert('İstek gönderme hatası: ' + e.message);
+                }
+            });
+        }
     });
 </script>
 {% endblock %} 

@@ -54,155 +54,192 @@ def home(request):
 
 
 @login_required
+@require_POST
 @csrf_exempt  # For test purposes only, remove in production
 def send_request(request):
     """View for sending API requests and storing results"""
-    if request.method == 'POST':
-        try:
-            # Print debug info to console
-            print(f"Request received: {request.body[:1000] if hasattr(request, 'body') else 'No body'}")
-            
-            # Try to handle both form data and JSON
-            if request.content_type == 'application/json':
-                data = json.loads(request.body)
-                print(f"Parsed JSON data: {json.dumps(data)[:1000]}")
-            else:
-                # Handle form data
-                data = {
-                    'url': request.POST.get('url', ''),
-                    'method': request.POST.get('method', 'GET').upper(),
-                    'headers': {},  # Form will handle this differently
-                    'params': {},
-                    'body': {},
-                    'auth': {},
-                }
-                
-            url = data.get('url', '')
-            method = data.get('method', 'GET').upper()
-            headers = data.get('headers', {})
-            params = data.get('params', {})
-            request_body = data.get('body', {})
-            auth_data = data.get('auth', {})
-            follow_redirects = data.get('follow_redirects', True)
-            verify_ssl = data.get('verify_ssl', True)
-            
-            print(f"Processing request: {method} {url}")
-            print(f"Verify SSL: {verify_ssl}")
-            print(f"Auth data structure: {type(auth_data)}")
-            print(f"Auth data: {json.dumps(auth_data)}")
-            print(f"Headers before auth: {json.dumps(headers)}")
-            
-            # Check if auth is already applied to headers (by client-side JS)
-            auth_already_applied = False
-            if 'Authorization' in headers:
-                print(f"Authorization header already exists: {headers['Authorization'][:15]}...")
-                auth_already_applied = True
-            
-            auth = None
-            # Handle Basic auth
-            if auth_data and auth_data.get('type') == 'basic':
-                username = auth_data.get('username', '')
-                password = auth_data.get('password', '')
-                if username:
-                    auth = (username, password)
-                    print(f"Using Basic Auth: username={username}, password={'*'*len(password) if password else 'None'}")
-            # Handle Bearer token
-            elif auth_data and auth_data.get('type') == 'bearer' and not auth_already_applied:
-                token = auth_data.get('token', '')
-                if token:
-                    headers['Authorization'] = f"Bearer {token}"
-                    print(f"Using Bearer Token Auth: {token[:5]}***")
-            # Handle API Key
-            elif auth_data and auth_data.get('type') == 'apikey' and not auth_already_applied:
-                key_name = auth_data.get('key', '')
-                key_value = auth_data.get('value', '')
-                location = auth_data.get('location', 'header')
-                
-                if key_name and key_value:
-                    if location == 'header':
-                        headers[key_name] = key_value
-                        print(f"Using API Key Auth in header: {key_name}={key_value[:5]}***")
-                    elif location == 'query':
-                        params[key_name] = key_value
-                        print(f"Using API Key Auth in query param: {key_name}={key_value[:5]}***")
-            
-            print(f"Headers after auth: {json.dumps(headers)}")
-            print(f"Auth tuple: {auth}")
-            
-            start_time = time.time()
-            
-            request_kwargs = {
-                'headers': headers,
-                'params': params,
-                'verify': verify_ssl,
-                'allow_redirects': follow_redirects,
-                'timeout': 30  # Add a reasonable timeout
+    try:
+        # Print debug info to console
+        print(f"Request received: {request.body[:1000] if hasattr(request, 'body') else 'No body'}")
+        
+        # Try to handle both form data and JSON
+        if request.content_type == 'application/json':
+            data = json.loads(request.body)
+            print(f"Parsed JSON data: {json.dumps(data)[:1000]}")
+        else:
+            # Handle form data
+            data = {
+                'url': request.POST.get('url', ''),
+                'method': request.POST.get('method', 'GET').upper(),
+                'headers': {},  # Form will handle this differently
+                'params': {},
+                'body': {},
+                'auth': {},
             }
             
-            # Only add auth if it's present (for basic auth)
-            if auth:
-                request_kwargs['auth'] = auth
-                print(f"Added Basic Auth to request_kwargs")
+        url = data.get('url', '')
+        method = data.get('method', 'GET').upper()
+        headers = data.get('headers', {})
+        params = data.get('params', {})
+        request_body = data.get('body', {})
+        auth_data = data.get('auth', {})
+        follow_redirects = data.get('follow_redirects', True)
+        verify_ssl = data.get('verify_ssl', True)
+        
+        if not url:
+            return JsonResponse({'error': 'URL is required'}, status=400)
+        
+        print(f"Processing request: {method} {url}")
+        print(f"Verify SSL: {verify_ssl}")
+        print(f"Auth data structure: {type(auth_data)}")
+        print(f"Auth data: {json.dumps(auth_data)}")
+        print(f"Headers before auth: {json.dumps(headers)}")
+        
+        # Check if auth is already applied to headers (by client-side JS)
+        auth_already_applied = False
+        if 'Authorization' in headers:
+            print(f"Authorization header already exists: {headers['Authorization'][:15]}...")
+            auth_already_applied = True
+        
+        auth = None
+        # Handle Basic auth
+        if auth_data and auth_data.get('type') == 'basic':
+            username = auth_data.get('username', '')
+            password = auth_data.get('password', '')
+            if username:
+                auth = (username, password)
+                print(f"Using Basic Auth: username={username}, password={'*'*len(password) if password else 'None'}")
+        # Handle Bearer token
+        elif auth_data and auth_data.get('type') == 'bearer' and not auth_already_applied:
+            token = auth_data.get('token', '')
+            if token:
+                headers['Authorization'] = f"Bearer {token}"
+                print(f"Using Bearer Token Auth: {token[:5]}***")
+        # Handle API Key
+        elif auth_data and auth_data.get('type') == 'apikey' and not auth_already_applied:
+            key_name = auth_data.get('key', '')
+            key_value = auth_data.get('value', '')
+            location = auth_data.get('location', 'header')
             
-            # For debugging - show actual request parameters
-            debug_kwargs = request_kwargs.copy()
-            if 'auth' in debug_kwargs:
-                debug_kwargs['auth'] = '(AUTH CREDENTIALS HIDDEN)'
-            if 'headers' in debug_kwargs and 'Authorization' in debug_kwargs['headers']:
-                headers_copy = debug_kwargs['headers'].copy()
-                headers_copy['Authorization'] = headers_copy['Authorization'][:10] + '...'
-                debug_kwargs['headers'] = headers_copy
-            
-            print(f"Final request kwargs: {json.dumps(debug_kwargs)}")
-            
-            # Add json body for methods that support it
-            if method in ['POST', 'PUT', 'PATCH']:
+            if key_name and key_value:
+                if location == 'header':
+                    headers[key_name] = key_value
+                    print(f"Using API Key Auth in header: {key_name}={key_value[:5]}***")
+                elif location == 'query':
+                    params[key_name] = key_value
+                    print(f"Using API Key Auth in query param: {key_name}={key_value[:5]}***")
+        
+        print(f"Headers after auth: {json.dumps(headers)}")
+        print(f"Auth tuple: {auth}")
+        
+        # Add default headers if not present
+        if method in ['POST', 'PUT', 'PATCH'] and 'Content-Type' not in headers:
+            headers['Content-Type'] = 'application/json'
+        
+        # Add User-Agent if not present
+        if 'User-Agent' not in headers:
+            headers['User-Agent'] = 'ProbeFlex/1.0 (API Testing Tool)'
+        
+        # Add Accept header if not present
+        if 'Accept' not in headers:
+            headers['Accept'] = 'application/json, text/plain, */*'
+        
+        print(f"Headers after defaults: {json.dumps(headers)}")
+        
+        start_time = time.time()
+        
+        request_kwargs = {
+            'headers': headers,
+            'params': params,
+            'verify': verify_ssl,
+            'allow_redirects': follow_redirects,
+            'timeout': 30  # Add a reasonable timeout
+        }
+        
+        # Only add auth if it's present (for basic auth)
+        if auth:
+            request_kwargs['auth'] = auth
+            print(f"Added Basic Auth to request_kwargs")
+        
+        # For debugging - show actual request parameters
+        debug_kwargs = request_kwargs.copy()
+        if 'auth' in debug_kwargs:
+            debug_kwargs['auth'] = '(AUTH CREDENTIALS HIDDEN)'
+        if 'headers' in debug_kwargs and 'Authorization' in debug_kwargs['headers']:
+            headers_copy = debug_kwargs['headers'].copy()
+            headers_copy['Authorization'] = headers_copy['Authorization'][:10] + '...'
+            debug_kwargs['headers'] = headers_copy
+        
+        print(f"Final request kwargs: {json.dumps(debug_kwargs)}")
+        
+        # Add json body for methods that support it
+        if method in ['POST', 'PUT', 'PATCH']:
+            # If body is empty, send empty JSON object
+            if not request_body or request_body == {}:
+                request_kwargs['json'] = {}
+            else:
                 request_kwargs['json'] = request_body
-            # For GET requests, we handle the body separately by adding to query params if needed
-            elif method == 'GET' and request_body:
-                # If there's body content in a GET request, log a warning
-                print(f"Warning: Body content sent with GET request: {request_body}")
-                # Use params instead of body for GET requests
-                if isinstance(request_body, dict):
-                    for key, value in request_body.items():
-                        request_kwargs['params'][key] = value
-            
-            if method == 'GET':
-                response = requests.get(url, **request_kwargs)
-            elif method == 'POST':
-                response = requests.post(url, **request_kwargs)
-            elif method == 'PUT':
-                response = requests.put(url, **request_kwargs)
-            elif method == 'PATCH':
-                response = requests.patch(url, **request_kwargs)
-            elif method == 'DELETE':
-                response = requests.delete(url, **request_kwargs)
-            elif method == 'HEAD':
-                response = requests.head(url, **request_kwargs)
-            elif method == 'OPTIONS':
-                response = requests.options(url, **request_kwargs)
-            else:
-                return JsonResponse({'error': 'Invalid HTTP method'}, status=400)
-            
-            end_time = time.time()
-            response_time = (end_time - start_time) * 1000  # Convert to milliseconds
-            
-            # Try to parse response as JSON, if not return text
+            print(f"JSON body being sent: {request_kwargs.get('json', {})}")
+        # For GET requests, we handle the body separately by adding to query params if needed
+        elif method == 'GET' and request_body:
+            # If there's body content in a GET request, log a warning
+            print(f"Warning: Body content sent with GET request: {request_body}")
+            # Use params instead of body for GET requests
+            if isinstance(request_body, dict):
+                for key, value in request_body.items():
+                    request_kwargs['params'][key] = value
+        
+        if method == 'GET':
+            response = requests.get(url, **request_kwargs)
+        elif method == 'POST':
+            # Log the exact request being made
+            print(f"=== MAKING POST REQUEST ===")
+            print(f"URL: {url}")
+            print(f"Headers: {request_kwargs.get('headers', {})}")
+            print(f"JSON Body: {request_kwargs.get('json', {})}")
+            print(f"Auth: {request_kwargs.get('auth', 'None')}")
+            print(f"Verify SSL: {request_kwargs.get('verify', True)}")
+            print(f"========================")
+            response = requests.post(url, **request_kwargs)
+        elif method == 'PUT':
+            response = requests.put(url, **request_kwargs)
+        elif method == 'PATCH':
+            response = requests.patch(url, **request_kwargs)
+        elif method == 'DELETE':
+            response = requests.delete(url, **request_kwargs)
+        elif method == 'HEAD':
+            response = requests.head(url, **request_kwargs)
+        elif method == 'OPTIONS':
+            response = requests.options(url, **request_kwargs)
+        else:
+            return JsonResponse({'error': 'Invalid HTTP method'}, status=400)
+        
+        print(f"=== RESPONSE RECEIVED ===")
+        print(f"Status Code: {response.status_code}")
+        print(f"Response Headers: {dict(response.headers)}")
+        print(f"Response Body (first 500 chars): {response.text[:500]}")
+        print(f"========================")
+        
+        end_time = time.time()
+        response_time = (end_time - start_time) * 1000  # Convert to milliseconds
+        
+        # Try to parse response as JSON, if not return text
+        try:
+            response_body = response.json()
+        except ValueError:
+            response_body = response.text
+        
+        response_data = {
+            'status_code': response.status_code,
+            'headers': dict(response.headers),
+            'body': response_body,
+            'time': response_time
+        }
+        
+        # Save request history if there's an associated API request
+        api_request_id = data.get('api_request_id')
+        if api_request_id:
             try:
-                response_body = response.json()
-            except ValueError:
-                response_body = response.text
-            
-            response_data = {
-                'status_code': response.status_code,
-                'headers': dict(response.headers),
-                'body': response_body,
-                'time': response_time
-            }
-            
-            # Save request history if there's an associated API request
-            api_request_id = data.get('api_request_id')
-            if api_request_id:
                 api_request = get_object_or_404(APIRequest, id=api_request_id)
                 
                 # Create request history
@@ -220,33 +257,22 @@ def send_request(request):
                     response_time=response_time,
                     executed_by=request.user
                 )
-            
-            print(f"Request completed: {method} {url} - {response.status_code}")
-            return JsonResponse(response_data)
+            except Exception as history_error:
+                print(f"Error saving request history: {str(history_error)}")
+                # Don't fail the main request if history saving fails
         
-        except requests.RequestException as e:
-            print(f"Request error: {str(e)}")
-            return JsonResponse({'error': str(e)}, status=500)
-        except Exception as e:
-            print(f"Unexpected error: {str(e)}")
-            return JsonResponse({'error': str(e)}, status=500)
+        print(f"Request completed: {method} {url} - {response.status_code}")
+        return JsonResponse(response_data)
     
-    # For debugging - allow GET requests temporarily
-    if request.method == 'GET':
-        test_url = request.GET.get('url')
-        if test_url:
-            try:
-                response = requests.get(test_url)
-                return JsonResponse({
-                    'status_code': response.status_code,
-                    'body': response.text[:1000],  # Truncate long responses
-                    'headers': dict(response.headers),
-                    'time': 0
-                })
-            except Exception as e:
-                return JsonResponse({'error': str(e)})
-    
-    return JsonResponse({'error': 'Only POST requests are allowed'}, status=405)
+    except requests.RequestException as e:
+        print(f"Request error: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
+    except json.JSONDecodeError as e:
+        print(f"JSON decode error: {str(e)}")
+        return JsonResponse({'error': 'Invalid JSON in request body'}, status=400)
+    except Exception as e:
+        print(f"Unexpected error: {str(e)}")
+        return JsonResponse({'error': str(e)}, status=500)
 
 
 # Project Views
