@@ -336,281 +336,77 @@
 
 {% block extra_js %}
 <script src="{% static 'js/send_request.js' %}"></script>
+<script src="{% static 'js/common_request_ui.js' %}"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Sayfa yüklendiğinde JSON verilerini gizli form elemanlarına yükle
+        // Initialize common UI functionality  
+        initializeRequestUI();
+        
+        // Load request data from Django json_script filters
         try {
-            // Güvenli JSON parse fonksiyonu - Django'nun json_script filter'ı ile çalışır
-            function safeJsonParse(elementId, defaultValue = {}) {
-                try {
-                    const element = document.getElementById(elementId);
-                    if (!element) {
-                        console.warn(`Element ${elementId} not found`);
-                        return defaultValue;
-                    }
-                    
-                    // Django json_script filter uses textContent directly
-                    const data = JSON.parse(element.textContent);
-                    return data;
-                } catch (e) {
-                    console.error(`JSON parse error for ${elementId}:`, e);
-                    console.error('Raw text:', element ? element.textContent : 'Element not found');
-                    return defaultValue;
-                }
-            }
-            
-            // Güvenli element alma fonksiyonu
-            function safeGetElement(id) {
-                const element = document.getElementById(id);
-                if (!element) {
-                    console.warn(`Element ${id} not found`);
-                }
-                return element;
-            }
-            
-            // JSON verilerini al ve konsola yazdır (hata ayıklama için)
-            const headersElement = safeGetElement('headers-data');
-            const paramsElement = safeGetElement('params-data');
-            const bodyElement = safeGetElement('body-data');
-            const authElement = safeGetElement('auth-data');
-            const urlElement = safeGetElement('request-url');
-            const methodElement = safeGetElement('request-method');
-            
-            console.log('Headers raw:', headersElement ? headersElement.textContent : 'Element not found');
-            console.log('Params raw:', paramsElement ? paramsElement.textContent : 'Element not found');
-            console.log('Body raw:', bodyElement ? bodyElement.textContent : 'Element not found');
-            console.log('Auth raw:', authElement ? authElement.textContent : 'Element not found');
-            console.log('URL raw:', urlElement ? urlElement.textContent : 'Element not found');
-            console.log('Method raw:', methodElement ? methodElement.textContent : 'Element not found');
-            
-            // Her bir JSON verisini güvenli şekilde parse edelim
             const headers = safeJsonParse('headers-data', {});
             const params = safeJsonParse('params-data', {});
             const body = safeJsonParse('body-data', {});
             const auth = safeJsonParse('auth-data', {});
-            const api_request_id = safeJsonParse('request-id', null);
+            const url = safeJsonParse('request-url', '');
+            const method = safeJsonParse('request-method', '');
+            const followRedirects = safeJsonParse('follow-redirects', true);
+            const verifySSL = safeJsonParse('verify-ssl', true);
             
-            console.log('Parsed headers:', headers);
-            console.log('Parsed params:', params);
-            console.log('Parsed body:', body);
-            console.log('Parsed auth:', auth);
-            console.log('Parsed request ID:', api_request_id);
+            // Create request data object
+            const requestData = {
+                method: method,
+                url: url,
+                follow_redirects: followRedirects,
+                verify_ssl: verifySSL,
+                auth: auth,
+                headers: headers,
+                params: params,
+                body: body
+            };
             
-            // URL ve method bilgilerini form elemanlarına yükle
-            let url = '';
-            let method = '';
+            // Populate form with request data
+            populateFormFromRequestData(requestData);
             
-            if (urlElement) {
-                try {
-                    const urlText = urlElement.textContent.trim();
-                    if (urlText && urlText !== '""' && urlText !== 'null') {
-                        // Eğer text zaten quotes içindeyse JSON parse et, değilse direkt kullan
-                        if (urlText.startsWith('"') && urlText.endsWith('"')) {
-                            url = JSON.parse(urlText);
-                        } else {
-                            url = urlText;
-                        }
-                    }
-                } catch (e) {
-                    console.error('URL parse hatası:', e);
-                    // Fallback - quotes'ları temizle
-                    url = urlElement.textContent.trim().replace(/^"|"$/g, '');
-                }
-                
-                const urlAjaxElement = safeGetElement('url-ajax');
-                if (urlAjaxElement && url) {
-                    urlAjaxElement.value = url;
-                }
-            }
-            
-            if (methodElement) {
-                try {
-                    const methodText = methodElement.textContent.trim();
-                    if (methodText && methodText !== '""' && methodText !== 'null') {
-                        // Eğer text zaten quotes içindeyse JSON parse et, değilse direkt kullan
-                        if (methodText.startsWith('"') && methodText.endsWith('"')) {
-                            method = JSON.parse(methodText);
-                        } else {
-                            method = methodText;
-                        }
-                    }
-                } catch (e) {
-                    console.error('Method parse hatası:', e);
-                    // Fallback - quotes'ları temizle
-                    method = methodElement.textContent.trim().replace(/^"|"$/g, '');
-                }
-                
-                if (method) {
-                    try {
-                        const methodSelectElement = document.querySelector('#method-ajax option[value="' + method + '"]');
-                        if (methodSelectElement) {
-                            methodSelectElement.selected = true;
-                        }
-                    } catch (selectError) {
-                        console.error('Method select hatası:', selectError);
-                    }
-                }
-            }
-            
-            // Auth bilgilerini ilgili form alanlarına yükle
-            const authTypeElement = safeGetElement('auth-type');
-            if (auth && auth.type && authTypeElement) {
-                authTypeElement.value = auth.type || 'none';
-                
-                if (auth.type === 'basic') {
-                    const usernameElement = safeGetElement('basic-username');
-                    const passwordElement = safeGetElement('basic-password');
-                    if (usernameElement) usernameElement.value = auth.username || '';
-                    if (passwordElement) passwordElement.value = auth.password || '';
-                } else if (auth.type === 'bearer') {
-                    const tokenElement = safeGetElement('bearer-token');
-                    if (tokenElement) tokenElement.value = auth.token || '';
-                } else if (auth.type === 'apikey') {
-                    const keyNameElement = safeGetElement('apikey-name');
-                    const keyValueElement = safeGetElement('apikey-value');
-                    const keyLocationElement = safeGetElement('apikey-location');
-                    if (keyNameElement) keyNameElement.value = auth.key || '';
-                    if (keyValueElement) keyValueElement.value = auth.value || '';
-                    if (keyLocationElement) keyLocationElement.value = auth.location || 'header';
-                }
-            }
-            
-            // Diğer ayarları form elemanlarına yükle
-            const followRedirectsData = safeJsonParse('follow-redirects', true);
-            const verifySSLData = safeJsonParse('verify-ssl', true);
-            
-            const followRedirectsElement = safeGetElement('follow-redirects');
-            const verifySSLElement = safeGetElement('verify-ssl');
-            
-            if (followRedirectsElement) {
-                followRedirectsElement.checked = followRedirectsData;
-            }
-            if (verifySSLElement) {
-                verifySSLElement.checked = verifySSLData;
-            }
-            
-            // Headers için gizli alanları ekle
+            // Add hidden form fields for headers and params
             const headerRows = document.querySelector('.header-rows');
-            if (headerRows) {
-                headerRows.innerHTML = ''; // Temizle
-                
-                console.log('Adding headers to hidden fields:', headers);
-                if (headers && typeof headers === 'object') {
-                    Object.entries(headers).forEach(([key, value]) => {
-                        const row = document.createElement('div');
-                        row.className = 'row mb-2';
-                        
-                        // Güvenli bir şekilde HTML içeriği oluştur
-                        const safeKey = String(key).replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                        const safeValue = String(value).replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                        
-                        row.innerHTML = `
-                            <div class="col-5">
-                                <input type="hidden" class="form-control header-key" value="${safeKey}">
-                            </div>
-                            <div class="col-5">
-                                <input type="hidden" class="form-control header-value" value="${safeValue}">
-                            </div>
-                        `;
-                        headerRows.appendChild(row);
-                    });
-                }
+            if (headerRows && headers && typeof headers === 'object') {
+                headerRows.innerHTML = '';
+                Object.entries(headers).forEach(([key, value]) => {
+                    const row = document.createElement('div');
+                    row.className = 'row mb-2';
+                    row.innerHTML = `
+                        <div class="col-5">
+                            <input type="hidden" class="form-control header-key" value="${key}">
+                        </div>
+                        <div class="col-5">
+                            <input type="hidden" class="form-control header-value" value="${value}">
+                        </div>
+                    `;
+                    headerRows.appendChild(row);
+                });
             }
             
-            // Params için gizli alanları ekle
             const paramRows = document.querySelector('.param-rows');
-            if (paramRows) {
-                paramRows.innerHTML = ''; // Temizle
-                
-                console.log('Adding params to hidden fields:', params);
-                if (params && typeof params === 'object') {
-                    Object.entries(params).forEach(([key, value]) => {
-                        const row = document.createElement('div');
-                        row.className = 'row mb-2';
-                        
-                        // Güvenli bir şekilde HTML içeriği oluştur
-                        const safeKey = String(key).replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                        const safeValue = String(value).replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                        
-                        row.innerHTML = `
-                            <div class="col-5">
-                                <input type="hidden" class="form-control param-key" value="${safeKey}">
-                            </div>
-                            <div class="col-5">
-                                <input type="hidden" class="form-control param-value" value="${safeValue}">
-                            </div>
-                        `;
-                        paramRows.appendChild(row);
-                    });
-                }
+            if (paramRows && params && typeof params === 'object') {
+                paramRows.innerHTML = '';
+                Object.entries(params).forEach(([key, value]) => {
+                    const row = document.createElement('div');
+                    row.className = 'row mb-2';
+                    row.innerHTML = `
+                        <div class="col-5">
+                            <input type="hidden" class="form-control param-key" value="${key}">
+                        </div>
+                        <div class="col-5">
+                            <input type="hidden" class="form-control param-value" value="${value}">
+                        </div>
+                    `;
+                    paramRows.appendChild(row);
+                });
             }
             
-            // Body verisini ilgili editöre yükle
-            console.log('Setting body value:', body);
-            const jsonEditorElement = safeGetElement('json-editor');
-            const rawEditorElement = safeGetElement('raw-editor');
-            const bodyTypeElement = safeGetElement('body-type');
-            
-            if (body && typeof body === 'object' && Object.keys(body).length > 0) {
-                if (jsonEditorElement) {
-                    // Only stringify if it's already a parsed object
-                    if (typeof body === 'object') {
-                        jsonEditorElement.value = JSON.stringify(body, null, 2);
-                    } else {
-                        // If it's already a string, use it as is
-                        jsonEditorElement.value = body;
-                    }
-                }
-                if (bodyTypeElement) {
-                    bodyTypeElement.value = 'json';
-                }
-            } else if (typeof body === 'string' && body.trim()) {
-                // Check if the string is actually JSON
-                try {
-                    const parsedBody = JSON.parse(body);
-                    // If it parses successfully, it's JSON - put it in JSON editor
-                    if (jsonEditorElement) {
-                        jsonEditorElement.value = JSON.stringify(parsedBody, null, 2);
-                    }
-                    if (bodyTypeElement) {
-                        bodyTypeElement.value = 'json';
-                    }
-                } catch (e) {
-                    // If it doesn't parse, it's raw text
-                    if (rawEditorElement) {
-                        rawEditorElement.value = body;
-                    }
-                    if (bodyTypeElement) {
-                        bodyTypeElement.value = 'raw';
-                    }
-                }
-            } else {
-                // Empty body - set to none
-                if (bodyTypeElement) {
-                    bodyTypeElement.value = 'none';
-                }
-            }
-
         } catch (e) {
-            console.error('JSON verilerini işlerken genel hata oluştu:', e);
-        }
-        
-        // Send butonuna tıklayınca direkt standart sendRequest() fonksiyonunu çağır
-        const sendBtnElement = safeGetElement('send-btn-ajax');
-        if (sendBtnElement) {
-            sendBtnElement.addEventListener('click', function() {
-                try {
-                    if (typeof sendRequest === 'function') {
-                        sendRequest();
-                    } else {
-                        console.error('sendRequest function not found');
-                        alert('Send request function not available');
-                    }
-                } catch (e) {
-                    console.error('sendRequest çağrılırken hata:', e);
-                    alert('İstek gönderme hatası: ' + e.message);
-                }
-            });
+            console.error('Error loading request data:', e);
         }
     });
 </script>
