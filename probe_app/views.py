@@ -20,12 +20,28 @@ import time
 from datetime import datetime
 
 
+# ============================================================================
+# AUTHENTICATION VIEWS
+# ============================================================================
+
 class CustomLoginView(LoginView):
-    """Custom login view with remember me functionality"""
+    """
+    Custom login view with enhanced functionality for API testing tool users.
+    
+    Extends Django's built-in LoginView to add 'remember me' functionality,
+    which controls session expiry. When 'remember me' is unchecked, the session
+    expires when the user closes their browser for enhanced security.
+    """
     form_class = CustomAuthenticationForm
     template_name = 'registration/login.html'
     
     def form_valid(self, form):
+        """
+        Process successful login and handle 'remember me' functionality.
+        
+        If 'remember me' is not checked, the session will expire when the browser
+        is closed. Otherwise, it uses Django's default session expiry settings.
+        """
         remember_me = form.cleaned_data.get('remember_me')
         if not remember_me:
             # Session expires when the user closes the browser
@@ -34,15 +50,34 @@ class CustomLoginView(LoginView):
 
 
 class SignUpView(CreateView):
-    """Sign up view for new users"""
+    """
+    User registration view for new API testing tool users.
+    
+    Allows new users to create accounts to access ProbeFlex's API testing features.
+    Upon successful registration, users are redirected to the login page.
+    """
     form_class = CustomUserCreationForm
     template_name = 'registration/signup.html'
     success_url = reverse_lazy('login')
 
 
+# ============================================================================
+# MAIN APPLICATION VIEWS
+# ============================================================================
+
 @login_required
 def home(request):
-    """Home view for API testing interface"""
+    """
+    Main dashboard view for the API testing interface.
+    
+    Displays the primary workspace where users can test API endpoints.
+    Shows projects that the user either owns or has access to through team membership.
+    This serves as the main entry point for API testing activities.
+    
+    Returns:
+        Rendered home.html template with accessible projects context
+    """
+    # Get projects that the user owns or has access to via team membership
     projects = (Project.objects.filter(owner=request.user) | 
                 Project.objects.filter(teams__members=request.user)).distinct()
     
@@ -56,17 +91,41 @@ def home(request):
 @require_POST
 @csrf_exempt  # For test purposes only, remove in production
 def send_request(request):
-    """View for sending API requests and storing results"""
+    """
+    Core API request execution endpoint.
+    
+    This is the heart of ProbeFlex - it handles the execution of API requests
+    submitted from the frontend interface. It supports all major HTTP methods,
+    various authentication types (Basic, Bearer, API Key), custom headers,
+    query parameters, and request bodies.
+    
+    Features:
+    - Supports GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS methods
+    - Multiple authentication methods (Basic Auth, Bearer Token, API Key)
+    - Custom headers and query parameters
+    - JSON request bodies for POST/PUT/PATCH requests
+    - SSL verification control and redirect following
+    - Request timeout handling
+    - Response time measurement
+    - Automatic request history tracking
+    
+    Returns:
+        JsonResponse containing:
+        - status_code: HTTP status code from the API
+        - headers: Response headers as dictionary
+        - body: Response body (JSON or text)
+        - time: Response time in milliseconds
+    """
     try:
-        # Print debug info to console
+        # Debug logging for request analysis
         print(f"Request received: {request.body[:1000] if hasattr(request, 'body') else 'No body'}")
         
-        # Try to handle both form data and JSON
+        # Handle both JSON and form data input formats
         if request.content_type == 'application/json':
             data = json.loads(request.body)
             print(f"Parsed JSON data: {json.dumps(data)[:1000]}")
         else:
-            # Handle form data
+            # Handle form data from older interfaces
             data = {
                 'url': request.POST.get('url', ''),
                 'method': request.POST.get('method', 'GET').upper(),
@@ -76,6 +135,7 @@ def send_request(request):
                 'auth': {},
             }
             
+        # Extract request configuration from parsed data
         url = data.get('url', '')
         method = data.get('method', 'GET').upper()
         headers = data.get('headers', {})
@@ -85,36 +145,42 @@ def send_request(request):
         follow_redirects = data.get('follow_redirects', True)
         verify_ssl = data.get('verify_ssl', True)
         
+        # Validate required fields
         if not url:
             return JsonResponse({'error': 'URL is required'}, status=400)
         
+        # Debug logging for request processing
         print(f"Processing request: {method} {url}")
         print(f"Verify SSL: {verify_ssl}")
         print(f"Auth data structure: {type(auth_data)}")
         print(f"Auth data: {json.dumps(auth_data)}")
         print(f"Headers before auth: {json.dumps(headers)}")
         
-        # Check if auth is already applied to headers (by client-side JS)
+        # Check if authentication is already applied to headers (by client-side JS)
         auth_already_applied = False
         if 'Authorization' in headers:
             print(f"Authorization header already exists: {headers['Authorization'][:15]}...")
             auth_already_applied = True
         
+        # Handle different authentication methods
         auth = None
-        # Handle Basic auth
+        
+        # Basic Authentication: uses HTTP Basic Auth with username/password
         if auth_data and auth_data.get('type') == 'basic':
             username = auth_data.get('username', '')
             password = auth_data.get('password', '')
             if username:
                 auth = (username, password)
                 print(f"Using Basic Auth: username={username}, password={'*'*len(password) if password else 'None'}")
-        # Handle Bearer token
+                
+        # Bearer Token Authentication: adds Authorization header with Bearer token
         elif auth_data and auth_data.get('type') == 'bearer' and not auth_already_applied:
             token = auth_data.get('token', '')
             if token:
                 headers['Authorization'] = f"Bearer {token}"
                 print(f"Using Bearer Token Auth: {token[:5]}***")
-        # Handle API Key
+                
+        # API Key Authentication: can be in header or query parameter
         elif auth_data and auth_data.get('type') == 'apikey' and not auth_already_applied:
             key_name = auth_data.get('key', '')
             key_value = auth_data.get('value', '')
@@ -131,36 +197,38 @@ def send_request(request):
         print(f"Headers after auth: {json.dumps(headers)}")
         print(f"Auth tuple: {auth}")
         
-        # Add default headers if not present
+        # Set default headers if not already present
         if method in ['POST', 'PUT', 'PATCH'] and 'Content-Type' not in headers:
             headers['Content-Type'] = 'application/json'
         
-        # Add User-Agent if not present
+        # Add User-Agent for API identification
         if 'User-Agent' not in headers:
             headers['User-Agent'] = 'ProbeFlex/1.0 (API Testing Tool)'
         
-        # Add Accept header if not present
+        # Add Accept header for response format preference
         if 'Accept' not in headers:
             headers['Accept'] = 'application/json, text/plain, */*'
         
         print(f"Headers after defaults: {json.dumps(headers)}")
         
+        # Record start time for response time measurement
         start_time = time.time()
         
+        # Prepare request configuration
         request_kwargs = {
             'headers': headers,
             'params': params,
             'verify': verify_ssl,
             'allow_redirects': follow_redirects,
-            'timeout': 30  # Add a reasonable timeout
+            'timeout': 30  # Add a reasonable timeout to prevent hanging
         }
         
-        # Only add auth if it's present (for basic auth)
+        # Add Basic Auth if configured (for requests library)
         if auth:
             request_kwargs['auth'] = auth
             print(f"Added Basic Auth to request_kwargs")
         
-        # For debugging - show actual request parameters
+        # Debug logging (hide sensitive auth information)
         debug_kwargs = request_kwargs.copy()
         if 'auth' in debug_kwargs:
             debug_kwargs['auth'] = '(AUTH CREDENTIALS HIDDEN)'
@@ -171,27 +239,28 @@ def send_request(request):
         
         print(f"Final request kwargs: {json.dumps(debug_kwargs)}")
         
-        # Add json body for methods that support it
+        # Handle request body for methods that support it
         if method in ['POST', 'PUT', 'PATCH']:
-            # If body is empty, send empty JSON object
+            # Send empty JSON object if no body provided
             if not request_body or request_body == {}:
                 request_kwargs['json'] = {}
             else:
                 request_kwargs['json'] = request_body
             print(f"JSON body being sent: {request_kwargs.get('json', {})}")
-        # For GET requests, we handle the body separately by adding to query params if needed
+            
+        # Handle GET requests with body content (convert to query params)
         elif method == 'GET' and request_body:
-            # If there's body content in a GET request, log a warning
             print(f"Warning: Body content sent with GET request: {request_body}")
-            # Use params instead of body for GET requests
+            # Convert body content to query parameters for GET requests
             if isinstance(request_body, dict):
                 for key, value in request_body.items():
                     request_kwargs['params'][key] = value
         
+        # Execute the HTTP request based on method
         if method == 'GET':
             response = requests.get(url, **request_kwargs)
         elif method == 'POST':
-            # Log the exact request being made
+            # Detailed logging for POST requests
             print(f"=== MAKING POST REQUEST ===")
             print(f"URL: {url}")
             print(f"Headers: {request_kwargs.get('headers', {})}")
@@ -213,21 +282,24 @@ def send_request(request):
         else:
             return JsonResponse({'error': 'Invalid HTTP method'}, status=400)
         
+        # Log response details
         print(f"=== RESPONSE RECEIVED ===")
         print(f"Status Code: {response.status_code}")
         print(f"Response Headers: {dict(response.headers)}")
         print(f"Response Body (first 500 chars): {response.text[:500]}")
         print(f"========================")
         
+        # Calculate response time
         end_time = time.time()
         response_time = (end_time - start_time) * 1000  # Convert to milliseconds
         
-        # Try to parse response as JSON, if not return text
+        # Parse response body (attempt JSON first, fallback to text)
         try:
             response_body = response.json()
         except ValueError:
             response_body = response.text
         
+        # Prepare response data for frontend
         response_data = {
             'status_code': response.status_code,
             'headers': dict(response.headers),
@@ -235,13 +307,13 @@ def send_request(request):
             'time': response_time
         }
         
-        # Save request history if there's an associated API request
+        # Save request execution to history for tracking and debugging
         api_request_id = data.get('api_request_id')
         if api_request_id:
             try:
                 api_request = get_object_or_404(APIRequest, id=api_request_id)
                 
-                # Create request history
+                # Create detailed history record
                 history = RequestHistory.objects.create(
                     request=api_request,
                     url=url,
@@ -274,127 +346,201 @@ def send_request(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 
-# Project Views
+# ============================================================================
+# PROJECT MANAGEMENT VIEWS
+# ============================================================================
+
 class ProjectListView(LoginRequiredMixin, ListView):
-    """View for listing projects accessible to the user"""
+    """
+    Display a list of API testing projects accessible to the current user.
+    
+    Shows projects that the user either owns directly or has access to through
+    team membership. This provides an overview of all available API testing
+    projects for the user.
+    """
     model = Project
     template_name = 'projects/project_list.html'
     context_object_name = 'projects'
     
     def get_queryset(self):
-        # Show projects owned by the user or accessible via teams
+        """
+        Return projects accessible to the current user.
+        
+        Includes both owned projects and projects accessible via team membership,
+        ensuring users see all projects they can work with.
+        """
         return (Project.objects.filter(owner=self.request.user) | 
                 Project.objects.filter(teams__members=self.request.user)).distinct()
 
 
 class ProjectDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
-    """View for project details"""
+    """
+    Display detailed view of a specific API testing project.
+    
+    Shows project information and all collections within the project.
+    Access is restricted to project owners and team members.
+    """
     model = Project
     template_name = 'projects/project_detail.html'
     context_object_name = 'project'
     
     def test_func(self):
+        """
+        Check if the current user has access to view this project.
+        
+        Returns True if user is the project owner or a member of any team
+        that has access to the project.
+        """
         project = self.get_object()
         return (project.owner == self.request.user or 
                 project.teams.filter(members=self.request.user).exists())
     
     def get_context_data(self, **kwargs):
+        """Add project's collections to the template context."""
         context = super().get_context_data(**kwargs)
         context['collections'] = self.object.collections.all()
         return context
 
 
 class ProjectCreateView(LoginRequiredMixin, CreateView):
-    """View for creating new projects"""
+    """
+    Create a new API testing project.
+    
+    Allows authenticated users to create new projects for organizing their
+    API testing workflows. The creating user automatically becomes the project owner.
+    """
     model = Project
     form_class = ProjectForm
     template_name = 'projects/project_form.html'
     success_url = reverse_lazy('project_list')
     
     def form_valid(self, form):
+        """Set the current user as the project owner."""
         form.instance.owner = self.request.user
         return super().form_valid(form)
 
 
 class ProjectUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
-    """View for updating existing projects"""
+    """
+    Update an existing API testing project.
+    
+    Only project owners can modify project details such as name, description,
+    and team access permissions.
+    """
     model = Project
     form_class = ProjectForm
     template_name = 'projects/project_form.html'
     
     def test_func(self):
+        """Ensure only project owners can edit projects."""
         project = self.get_object()
         return project.owner == self.request.user
     
     def get_success_url(self):
+        """Redirect to project detail page after successful update."""
         return reverse_lazy('project_detail', kwargs={'pk': self.object.pk})
 
 
 class ProjectDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
-    """View for deleting projects"""
+    """
+    Delete an API testing project.
+    
+    Only project owners can delete projects. This will also delete all
+    associated collections, API requests, and request history.
+    """
     model = Project
     template_name = 'projects/project_confirm_delete.html'
     success_url = reverse_lazy('project_list')
     
     def test_func(self):
+        """Ensure only project owners can delete projects."""
         project = self.get_object()
         return project.owner == self.request.user
 
 
-# Collection Views
+# ============================================================================
+# COLLECTION MANAGEMENT VIEWS
+# ============================================================================
+
 class CollectionCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
-    """View for creating new collections within a project"""
+    """
+    Create a new API request collection within a project.
+    
+    Collections help organize related API endpoints within a project.
+    Access is restricted to project owners and team members.
+    """
     model = Collection
     form_class = CollectionForm
     template_name = 'collections/collection_form.html'
     
     def test_func(self):
+        """Check if user has access to create collections in this project."""
         project_id = self.kwargs.get('project_id')
         project = get_object_or_404(Project, id=project_id)
         return (project.owner == self.request.user or 
                 project.teams.filter(members=self.request.user).exists())
     
     def form_valid(self, form):
+        """Associate the collection with the specified project."""
         project_id = self.kwargs.get('project_id')
         project = get_object_or_404(Project, id=project_id)
         form.instance.project = project
         return super().form_valid(form)
     
     def get_context_data(self, **kwargs):
+        """Add project ID to template context for form processing."""
         context = super().get_context_data(**kwargs)
         context['project_id'] = self.kwargs.get('project_id')
         return context
     
     def get_success_url(self):
+        """Redirect to project detail page after successful creation."""
         return reverse_lazy('project_detail', kwargs={'pk': self.kwargs.get('project_id')})
 
 
 class CollectionDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
-    """View for collection details"""
+    """
+    Display detailed view of an API request collection.
+    
+    Shows collection information and all API requests within the collection.
+    Access is restricted to project owners and team members.
+    """
     model = Collection
     template_name = 'collections/collection_detail.html'
     context_object_name = 'collection'
     
     def test_func(self):
+        """Check if user has access to view this collection."""
         collection = self.get_object()
         project = collection.project
         return (project.owner == self.request.user or 
                 project.teams.filter(members=self.request.user).exists())
     
     def get_context_data(self, **kwargs):
+        """Add collection's API requests to the template context."""
         context = super().get_context_data(**kwargs)
         context['requests'] = self.object.requests.all()
         return context
 
 
-# API Request Views
+# ============================================================================
+# API REQUEST MANAGEMENT VIEWS
+# ============================================================================
+
 class APIRequestCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
-    """View for creating new API requests within a collection"""
+    """
+    Create a new API request within a collection.
+    
+    Allows users to define new API endpoints for testing, including all
+    request configuration such as URL, method, headers, parameters, body,
+    and authentication settings.
+    """
     model = APIRequest
     form_class = APIRequestForm
     template_name = 'requests/request_form.html'
     
     def test_func(self):
+        """Check if user has access to create API requests in this collection."""
         collection_id = self.kwargs.get('collection_id')
         collection = get_object_or_404(Collection, id=collection_id)
         project = collection.project
@@ -402,21 +548,27 @@ class APIRequestCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
                 project.teams.filter(members=self.request.user).exists())
     
     def form_valid(self, form):
+        """
+        Process form data and create the API request with all configuration.
+        
+        Handles both basic form fields and complex JSON fields for headers,
+        parameters, body, and authentication settings.
+        """
         collection_id = self.kwargs.get('collection_id')
         collection = get_object_or_404(Collection, id=collection_id)
         form.instance.collection = collection
         
-        # Set additional fields from hidden form inputs
+        # Set basic request configuration from form data
         form.instance.url = self.request.POST.get('url', '')
         form.instance.method = self.request.POST.get('method', 'GET')
         
-        # Handle JSON fields
+        # Parse JSON fields for complex configuration
         form.instance.headers = json.loads(self.request.POST.get('headers', '{}'))
         form.instance.params = json.loads(self.request.POST.get('params', '{}'))
         form.instance.body = json.loads(self.request.POST.get('body', '{}'))
         form.instance.auth = json.loads(self.request.POST.get('auth', '{}'))
         
-        # Handle additional request settings
+        # Set additional request options
         form.instance.timeout = int(self.request.POST.get('timeout', 30000))
         form.instance.follow_redirects = self.request.POST.get('follow_redirects', 'true').lower() == 'true'
         form.instance.verify_ssl = self.request.POST.get('verify_ssl', 'true').lower() == 'true'
@@ -424,61 +576,84 @@ class APIRequestCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
         return super().form_valid(form)
     
     def get_context_data(self, **kwargs):
+        """Add collection ID to template context."""
         context = super().get_context_data(**kwargs)
         context['collection_id'] = self.kwargs.get('collection_id')
         return context
     
     def get_success_url(self):
+        """Redirect to collection detail page after successful creation."""
         return reverse_lazy('collection_detail', kwargs={'pk': self.kwargs.get('collection_id')})
 
 
 class APIRequestDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
-    """View for API request details"""
+    """
+    Display detailed view of an API request configuration.
+    
+    Shows the complete API request configuration and recent execution history.
+    This allows users to review and analyze their API testing results.
+    """
     model = APIRequest
     template_name = 'requests/request_detail.html'
     context_object_name = 'request'
     
     def test_func(self):
+        """Check if user has access to view this API request."""
         api_request = self.get_object()
         project = api_request.collection.project
         return (project.owner == self.request.user or 
                 project.teams.filter(members=self.request.user).exists())
     
     def get_context_data(self, **kwargs):
+        """Add recent request execution history to template context."""
         context = super().get_context_data(**kwargs)
-        context['history'] = self.object.history.all()[:10]  # Get the last 10 request executions
+        # Show the 10 most recent executions for analysis
+        context['history'] = self.object.history.all()[:10]
         return context
 
 
 class APIRequestUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
-    """View for updating API requests"""
+    """
+    Update an existing API request configuration.
+    
+    Allows users to modify all aspects of an API request including URL, method,
+    headers, parameters, body, authentication, and request options.
+    """
     model = APIRequest
     form_class = APIRequestForm
     template_name = 'requests/request_form.html'
     
     def test_func(self):
+        """Check if user has access to edit this API request."""
         api_request = self.get_object()
         project = api_request.collection.project
         return (project.owner == self.request.user or 
                 project.teams.filter(members=self.request.user).exists())
     
     def get_context_data(self, **kwargs):
+        """Add collection ID to template context for form processing."""
         context = super().get_context_data(**kwargs)
         context['collection_id'] = self.object.collection.id
         return context
     
     def form_valid(self, form):
-        # Set additional fields from hidden form inputs
+        """
+        Process updated form data and save changes to the API request.
+        
+        Handles both basic form fields and complex JSON fields, similar
+        to the create view but updating an existing record.
+        """
+        # Update basic request configuration
         form.instance.url = self.request.POST.get('url', '')
         form.instance.method = self.request.POST.get('method', 'GET')
         
-        # Handle JSON fields
+        # Parse and update JSON fields
         form.instance.headers = json.loads(self.request.POST.get('headers', '{}'))
         form.instance.params = json.loads(self.request.POST.get('params', '{}'))
         form.instance.body = json.loads(self.request.POST.get('body', '{}'))
         form.instance.auth = json.loads(self.request.POST.get('auth', '{}'))
         
-        # Handle additional request settings
+        # Update additional request options
         form.instance.timeout = int(self.request.POST.get('timeout', 30000))
         form.instance.follow_redirects = self.request.POST.get('follow_redirects', 'true').lower() == 'true'
         form.instance.verify_ssl = self.request.POST.get('verify_ssl', 'true').lower() == 'true'
@@ -486,28 +661,49 @@ class APIRequestUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
         return super().form_valid(form)
     
     def get_success_url(self):
+        """Redirect to API request detail page after successful update."""
         return reverse_lazy('request_detail', kwargs={'pk': self.object.pk})
 
 
-# Team Views
+# ============================================================================
+# TEAM MANAGEMENT VIEWS
+# ============================================================================
+
 class TeamListView(LoginRequiredMixin, ListView):
-    """View for listing teams the user is a member of"""
+    """
+    Display a list of teams that the current user is a member of.
+    
+    Teams enable collaborative API testing by allowing multiple users
+    to work together on projects and share API test collections.
+    """
     model = Team
     template_name = 'teams/team_list.html'
     context_object_name = 'teams'
     
     def get_queryset(self):
+        """Return only teams where the current user is a member."""
         return Team.objects.filter(members=self.request.user)
 
 
 class TeamCreateView(LoginRequiredMixin, CreateView):
-    """View for creating new teams"""
+    """
+    Create a new team for collaborative API testing.
+    
+    The user who creates the team automatically becomes a member and can
+    then add other users to enable collaborative access to projects.
+    """
     model = Team
     form_class = TeamForm
     template_name = 'teams/team_form.html'
     success_url = reverse_lazy('team_list')
     
     def form_valid(self, form):
+        """
+        Create the team and automatically add the creator as a member.
+        
+        This ensures that the person creating the team has immediate access
+        to manage it and add other members.
+        """
         response = super().form_valid(form)
         # Add the creator to the team members
         self.object.members.add(self.request.user)
@@ -515,16 +711,23 @@ class TeamCreateView(LoginRequiredMixin, CreateView):
 
 
 class TeamDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
-    """View for team details"""
+    """
+    Display detailed view of a team.
+    
+    Shows team information, all team members, and projects that the team
+    has access to. Only team members can view team details.
+    """
     model = Team
     template_name = 'teams/team_detail.html'
     context_object_name = 'team'
     
     def test_func(self):
+        """Ensure only team members can view team details."""
         team = self.get_object()
         return team.members.filter(id=self.request.user.id).exists()
     
     def get_context_data(self, **kwargs):
+        """Add team's projects and members to template context."""
         context = super().get_context_data(**kwargs)
         context['projects'] = self.object.projects.all()
         context['members'] = self.object.members.all()
