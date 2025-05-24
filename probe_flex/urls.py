@@ -6,11 +6,11 @@ from django.conf import settings
 from django.conf.urls.static import static
 
 from probe_app.views import (
-    CustomLoginView, SignUpView, home, send_request,
+    CustomLoginView, SignUpView, home, send_request, user_search,
     ProjectListView, ProjectDetailView, ProjectCreateView, ProjectUpdateView, ProjectDeleteView,
     CollectionDetailView, CollectionCreateView,
     APIRequestDetailView, APIRequestCreateView,
-    TeamListView, TeamDetailView, TeamCreateView, APIRequestUpdateView
+    TeamListView, TeamDetailView, TeamCreateView, TeamUpdateView, TeamDeleteView, APIRequestUpdateView
 )
 
 urlpatterns = [
@@ -25,6 +25,7 @@ urlpatterns = [
     path('', RedirectView.as_view(url='/home/'), name='index'),
     path('home/', home, name='home'),
     path('api/send/', send_request, name='send_request'),
+    path('api/search-users/', user_search, name='search_users'),
     
     # Project URLs
     path('projects/', ProjectListView.as_view(), name='project_list'),
@@ -46,6 +47,8 @@ urlpatterns = [
     path('teams/', TeamListView.as_view(), name='team_list'),
     path('teams/new/', TeamCreateView.as_view(), name='team_create'),
     path('teams/<int:pk>/', TeamDetailView.as_view(), name='team_detail'),
+    path('teams/<int:pk>/edit/', TeamUpdateView.as_view(), name='team_update'),
+    path('teams/<int:pk>/delete/', TeamDeleteView.as_view(), name='team_delete'),
     
     # Include Django AllAuth URLs
     path('accounts/', include('allauth.urls')),

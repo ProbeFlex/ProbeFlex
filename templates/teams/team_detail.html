@@ -1,0 +1,186 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ team.name }} - Teams - ProbeFlex{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1>
+                <i class="fas fa-users me-2"></i>{{ team.name }}
+            </h1>
+            {% if team.description %}
+            <p class="text-muted mb-0">{{ team.description }}</p>
+            {% endif %}
+        </div>
+        <div class="btn-group" role="group">
+            <a href="{% url 'team_list' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Teams
+            </a>
+            <a href="{% url 'team_update' team.pk %}" class="btn btn-outline-primary">
+                <i class="fas fa-edit"></i> Edit Team
+            </a>
+            <a href="{% url 'team_delete' team.pk %}" class="btn btn-outline-danger">
+                <i class="fas fa-trash"></i> Delete Team
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Team Members -->
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-users me-2"></i>Team Members
+                        <span class="badge bg-primary ms-2">{{ members.count }}</span>
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if members %}
+                    <div class="list-group list-group-flush">
+                        {% for member in members %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                            <div class="d-flex align-items-center">
+                                <div class="avatar-placeholder me-3">
+                                    <i class="fas fa-user"></i>
+                                </div>
+                                <div>
+                                    <h6 class="mb-0">{{ member.username }}</h6>
+                                    {% if member.email %}
+                                    <small class="text-muted">{{ member.email }}</small>
+                                    {% endif %}
+                                    {% if member.first_name or member.last_name %}
+                                    <small class="text-muted d-block">{{ member.first_name }} {{ member.last_name }}</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% if member == user %}
+                            <span class="badge bg-success">You</span>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-user-plus text-muted" style="font-size: 2rem;"></i>
+                        <p class="text-muted mt-2">No members in this team yet.</p>
+                        <a href="{% url 'team_update' team.pk %}" class="btn btn-sm btn-primary">
+                            <i class="fas fa-plus"></i> Add Members
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Team Projects -->
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-folder me-2"></i>Team Projects
+                        <span class="badge bg-primary ms-2">{{ projects.count }}</span>
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if projects %}
+                    <div class="list-group list-group-flush">
+                        {% for project in projects %}
+                        <div class="list-group-item px-0">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="flex-grow-1">
+                                    <h6 class="mb-1">
+                                        <a href="{% url 'project_detail' project.pk %}" class="text-decoration-none">
+                                            {{ project.name }}
+                                        </a>
+                                    </h6>
+                                    {% if project.description %}
+                                    <p class="mb-1 text-muted small">{{ project.description|truncatewords:15 }}</p>
+                                    {% endif %}
+                                    <small class="text-muted">
+                                        <i class="fas fa-user me-1"></i>{{ project.owner.username }}
+                                        <i class="fas fa-layer-group me-1 ms-2"></i>{{ project.collections.count }} collection{{ project.collections.count|pluralize }}
+                                        <i class="fas fa-calendar me-1 ms-2"></i>{{ project.created_at|date:"M d, Y" }}
+                                    </small>
+                                </div>
+                                <a href="{% url 'project_detail' project.pk %}" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-arrow-right"></i>
+                                </a>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-folder-plus text-muted" style="font-size: 2rem;"></i>
+                        <p class="text-muted mt-2">This team doesn't have access to any projects yet.</p>
+                        <a href="{% url 'project_list' %}" class="btn btn-sm btn-primary">
+                            <i class="fas fa-plus"></i> Browse Projects
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Team Information -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-info-circle me-2"></i>Team Information
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <dl class="row">
+                                <dt class="col-sm-4">Team Name:</dt>
+                                <dd class="col-sm-8">{{ team.name }}</dd>
+                                
+                                <dt class="col-sm-4">Created:</dt>
+                                <dd class="col-sm-8">{{ team.created_at|date:"F d, Y \a\t h:i A" }}</dd>
+                                
+                                <dt class="col-sm-4">Last Updated:</dt>
+                                <dd class="col-sm-8">{{ team.updated_at|date:"F d, Y \a\t h:i A" }}</dd>
+                            </dl>
+                        </div>
+                        <div class="col-md-6">
+                            <dl class="row">
+                                <dt class="col-sm-4">Members:</dt>
+                                <dd class="col-sm-8">{{ members.count }} member{{ members.count|pluralize }}</dd>
+                                
+                                <dt class="col-sm-4">Projects:</dt>
+                                <dd class="col-sm-8">{{ projects.count }} project{{ projects.count|pluralize }}</dd>
+                                
+                                {% if team.description %}
+                                <dt class="col-sm-4">Description:</dt>
+                                <dd class="col-sm-8">{{ team.description }}</dd>
+                                {% endif %}
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.avatar-placeholder {
+    width: 40px;
+    height: 40px;
+    background-color: #6c757d;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+}
+</style>
+{% endblock %} 

@@ -7,6 +7,8 @@ from django.contrib.auth.views import LoginView
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, ListView, DetailView, UpdateView, DeleteView
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.contrib.auth.models import User
+from django.db.models import Q
 
 from .forms import (
     CustomAuthenticationForm, CustomUserCreationForm, 
@@ -732,3 +734,101 @@ class TeamDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
         context['projects'] = self.object.projects.all()
         context['members'] = self.object.members.all()
         return context
+
+
+class TeamUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
+    """
+    Update an existing team.
+    
+    Allows team members to modify team details and manage team membership.
+    Only team members can update team information.
+    """
+    model = Team
+    form_class = TeamForm
+    template_name = 'teams/team_form.html'
+    
+    def test_func(self):
+        """Ensure only team members can update the team."""
+        team = self.get_object()
+        return team.members.filter(id=self.request.user.id).exists()
+    
+    def get_success_url(self):
+        """Redirect to team detail page after successful update."""
+        return reverse_lazy('team_detail', kwargs={'pk': self.object.pk})
+
+
+class TeamDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
+    """
+    Delete a team.
+    
+    Only team members can delete a team. This will remove the team
+    but will not affect the projects it had access to.
+    """
+    model = Team
+    template_name = 'teams/team_confirm_delete.html'
+    success_url = reverse_lazy('team_list')
+    
+    def test_func(self):
+        """Ensure only team members can delete the team."""
+        team = self.get_object()
+        return team.members.filter(id=self.request.user.id).exists()
+
+
+# ============================================================================
+# USER SEARCH VIEW
+# ============================================================================
+
+@login_required
+def user_search(request):
+    """
+    AJAX endpoint for searching users to add to teams.
+    
+    Supports searching by username or email with pagination.
+    Used by Select2 widget in team forms for user selection.
+    
+    Query Parameters:
+        q: Search term for username or email
+        page: Page number for pagination (optional)
+    
+    Returns:
+        JsonResponse with Select2-compatible format:
+        {
+            "results": [{"id": user_id, "username": "...", "email": "..."}],
+            "pagination": {"more": boolean}
+        }
+    """
+    query = request.GET.get('q', '').strip()
+    page = int(request.GET.get('page', 1))
+    page_size = 20
+    
+    if not query:
+        return JsonResponse({
+            'results': [],
+            'pagination': {'more': False}
+        })
+    
+    # Search users by username or email, excluding the current user
+    users = User.objects.filter(
+        Q(username__icontains=query) | Q(email__icontains=query)
+    ).exclude(id=request.user.id).order_by('username')
+    
+    # Implement pagination
+    start_offset = (page - 1) * page_size
+    end_offset = start_offset + page_size
+    
+    paginated_users = users[start_offset:end_offset]
+    has_more = users.count() > end_offset
+    
+    # Format results for Select2
+    results = []
+    for user in paginated_users:
+        results.append({
+            'id': user.id,
+            'username': user.username,
+            'email': user.email or '',
+        })
+    
+    return JsonResponse({
+        'results': results,
+        'pagination': {'more': has_more}
+    })

@@ -1,0 +1,204 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}
+    {% if object %}Edit Team{% else %}Create New Team{% endif %} - ProbeFlex
+{% endblock %}
+
+{% block extra_css %}
+<!-- Select2 CSS for enhanced user selection -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<style>
+    .select2-container--default .select2-selection--multiple {
+        border: 1px solid #ced4da;
+        border-radius: 0.375rem;
+        min-height: calc(1.5em + 0.75rem + 2px);
+    }
+    .select2-container--default .select2-selection--multiple .select2-selection__choice {
+        background-color: var(--primary-color);
+        border: 1px solid var(--primary-color);
+        color: white;
+        border-radius: 0.25rem;
+        padding: 0.25rem 0.5rem;
+        margin: 0.125rem;
+    }
+    .select2-container--default .select2-selection--multiple .select2-selection__choice__remove {
+        color: white;
+        border-right: 1px solid rgba(255,255,255,0.3);
+        margin-right: 0.5rem;
+        padding-right: 0.5rem;
+    }
+    .select2-container--default .select2-selection--multiple .select2-selection__choice__remove:hover {
+        color: #ffffff;
+        background-color: transparent;
+    }
+    .user-info {
+        padding: 0.5rem;
+        border-bottom: 1px solid #eee;
+    }
+    .user-info:last-child {
+        border-bottom: none;
+    }
+    .user-email {
+        color: #6c757d;
+        font-size: 0.875rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>
+                    <i class="fas fa-users me-2"></i>
+                    {% if object %}Edit Team{% else %}Create New Team{% endif %}
+                </h1>
+                <a href="{% url 'team_list' %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to Teams
+                </a>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    <form method="post" id="team-form">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label for="{{ form.name.id_for_label }}" class="form-label">
+                                <i class="fas fa-tag me-1"></i> Team Name *
+                            </label>
+                            {{ form.name }}
+                            {% if form.name.errors %}
+                                <div class="text-danger mt-1">
+                                    {% for error in form.name.errors %}
+                                        <small>{{ error }}</small>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <div class="form-text">Choose a descriptive name for your team.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.description.id_for_label }}" class="form-label">
+                                <i class="fas fa-align-left me-1"></i> Description
+                            </label>
+                            {{ form.description }}
+                            {% if form.description.errors %}
+                                <div class="text-danger mt-1">
+                                    {% for error in form.description.errors %}
+                                        <small>{{ error }}</small>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <div class="form-text">Briefly describe the purpose or focus of this team.</div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="{{ form.members.id_for_label }}" class="form-label">
+                                <i class="fas fa-users me-1"></i> Team Members
+                            </label>
+                            <select name="members" id="{{ form.members.id_for_label }}" class="form-control" multiple>
+                                <!-- Options will be populated via AJAX -->
+                            </select>
+                            {% if form.members.errors %}
+                                <div class="text-danger mt-1">
+                                    {% for error in form.members.errors %}
+                                        <small>{{ error }}</small>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <div class="form-text">
+                                Search and select users to add to this team. Type to search by username or email.
+                                {% if not object %}You will automatically be added as a team member.{% endif %}
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-end gap-2">
+                            <a href="{% url 'team_list' %}" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Cancel
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i>
+                                {% if object %}Update Team{% else %}Create Team{% endif %}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Select2 JS for enhanced user selection -->
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+$(document).ready(function() {
+    // Initialize Select2 for user selection
+    $('#{{ form.members.id_for_label }}').select2({
+        placeholder: 'Search for users to add to the team...',
+        allowClear: true,
+        ajax: {
+            url: '{% url "search_users" %}',
+            dataType: 'json',
+            delay: 250,
+            data: function (params) {
+                return {
+                    q: params.term, // search term
+                    page: params.page
+                };
+            },
+            processResults: function (data, params) {
+                params.page = params.page || 1;
+                return {
+                    results: data.results.map(function(user) {
+                        return {
+                            id: user.id,
+                            text: user.username + (user.email ? ' (' + user.email + ')' : ''),
+                            username: user.username,
+                            email: user.email
+                        };
+                    }),
+                    pagination: {
+                        more: data.pagination.more
+                    }
+                };
+            },
+            cache: true
+        },
+        minimumInputLength: 1,
+        templateResult: function(user) {
+            if (user.loading) {
+                return user.text;
+            }
+            var $container = $(
+                '<div class="user-info">' +
+                    '<div class="user-name">' + user.username + '</div>' +
+                    (user.email ? '<div class="user-email">' + user.email + '</div>' : '') +
+                '</div>'
+            );
+            return $container;
+        },
+        templateSelection: function(user) {
+            return user.username || user.text;
+        }
+    });
+
+    // Pre-populate selected members if editing
+    {% if object %}
+    {% for member in object.members.all %}
+    var option = new Option(
+        '{{ member.username }}{% if member.email %} ({{ member.email }}){% endif %}', 
+        '{{ member.id }}', 
+        true, 
+        true
+    );
+    $('#{{ form.members.id_for_label }}').append(option).trigger('change');
+    {% endfor %}
+    {% endif %}
+});
+</script>
+{% endblock %} 
